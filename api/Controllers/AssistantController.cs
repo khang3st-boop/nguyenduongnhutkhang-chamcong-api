@@ -84,7 +84,7 @@ public class AssistantController(AppDbContext db, IConfiguration cfg, ILogger<As
                     log.LogWarning("Gemini {Status}: {Body}", (int)res.StatusCode, raw.Length > 400 ? raw[..400] : raw);
                     return (int)res.StatusCode == 429
                         ? Fail(429, "Trợ lý AI đang quá tải (hết lượt miễn phí), thử lại sau ít phút.")
-                        : Fail(502, "Trợ lý AI chưa trả lời được lúc này.");
+                        : Fail(502, $"Trợ lý AI chưa trả lời được (Gemini {(int)res.StatusCode}: {GeminiError(raw)}).");
                 }
 
                 var cand = JsonNode.Parse(raw)?["candidates"]?[0]?["content"];
@@ -126,6 +126,17 @@ public class AssistantController(AppDbContext db, IConfiguration cfg, ILogger<As
             log.LogWarning("Gọi Gemini thất bại: {Type}: {Message}", ex.GetType().Name, ex.Message);
             return Fail(502, "Không kết nối được trợ lý AI, vui lòng thử lại.");
         }
+    }
+
+    // Lý do Google trả lỗi (không chứa khóa), để chẩn đoán cấu hình sai.
+    private static string GeminiError(string raw)
+    {
+        try
+        {
+            var msg = JsonNode.Parse(raw)?["error"]?["message"]?.GetValue<string>() ?? raw;
+            return msg.Length > 160 ? msg[..160] : msg;
+        }
+        catch { return raw.Length > 160 ? raw[..160] : raw; }
     }
 
     // ---- Công cụ cho Gemini -------------------------------------------------------------------------------------
