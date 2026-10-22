@@ -23,7 +23,7 @@ public record LoginDto([Required] string Username, [Required] string Password, s
 public record OtpDto([Required] string Username, [Required, StringLength(6, MinimumLength = 6)] string Code);
 public record UsernameDto([Required] string Username, string? Channel = null);
 public record GoogleDto([Required] string IdToken, string? Role = null, string? InviteCode = null);
-public record UpdateProfileDto([StringLength(100)] string? FullName = null, [EmailAddress] string? Email = null, [StringLength(20)] string? Phone = null);
+public record UpdateProfileDto([StringLength(100)] string? FullName = null, [EmailAddress] string? Email = null, [StringLength(20)] string? Phone = null, string? Code = null);
 
 [Route("api/[controller]")]
 public class AuthController(
@@ -220,6 +220,32 @@ public class AuthController(
         return Ok(await Profile(user));
     }
 
+    // Đổi email / số điện thoại cần OTP (bảo mật): bước 1 yêu cầu mã, bước 2 gửi kèm mã. Đổi họ tên thì không cần.
+    // OTP gửi SMS tới số MỚI (chứng minh số thuộc về bạn); nếu chỉ đổi email thì gửi SMS tới số hiện tại
+    // (nhân viên chưa có số thì dùng số quản lý); không có số nào mới gửi email hiện tại.
+    [Authorize, HttpPost("me/request-change")]
+    public async Task<IActionResult> RequestProfileChange(UpdateProfileDto dto)
+    {
+        var user = await users.FindByIdAsync(UserId);
+        if (user == null) return Unauthorized();
+        var role = (await users.GetRolesAsync(user)).FirstOrDefault() ?? "";
+        var (phone, newEmail, err) = await ParseChange(user, role, dto);
+        if (err != null) return err;
+        if (!ContactChanged(user, phone, newEmail)) return Ok(new { status = true, needsOtp = false });
+
+        string? target; bool isSms;
+        if (phone != null && phone != SmsSender.Normalize(user.PhoneNumber)) (target, isSms) = (phone, true);
+        else
+        {
+            (target, isSms) = await ResolveTarget(user, role, "sms");
+            if (target == null) (target, isSms) = (await OtpTarget(user, role), false);
+        }
+        if (target == null) return Fail(400, "Không có số điện thoại hay email nào để gửi mã xác nhận.");
+        var sent = await SendOtp(user, ChangePurpose(phone, newEmail), target, "đổi thông tin tài khoản", isSms);
+        if (sent is not null) return sent;
+        return Ok(new { status = true, needsOtp = true, channel = isSms ? "sms" : "email", maskedTarget = isSms ? SmsSender.Mask(target) : Mask(target) });
+    }
+
     // PUT api/Auth/me : tự chỉnh họ tên, email, số điện thoại nhận OTP (mặc định nhân viên dùng email/SĐT của quản lý)
     [Authorize, HttpPut("me")]
     public async Task<IActionResult> UpdateMe(UpdateProfileDto dto)
@@ -227,29 +253,48 @@ public class AuthController(
         var user = await users.FindByIdAsync(UserId);
         if (user == null) return Unauthorized();
         var role = (await users.GetRolesAsync(user)).FirstOrDefault() ?? "";
-        if (!string.IsNullOrWhiteSpace(dto.FullName)) user.FullName = dto.FullName.Trim();
+        var (phone, newEmail, err) = await ParseChange(user, role, dto);
+        if (err != null) return err;
 
-        var phone = SmsSender.Normalize(dto.Phone);
-        if (!string.IsNullOrWhiteSpace(dto.Phone) && phone == null) return Fail(400, "Số điện thoại không hợp lệ.");
-        user.PhoneNumber = phone;
-
-        var newEmail = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
-        if (!string.Equals(newEmail, user.Email, StringComparison.OrdinalIgnoreCase))
+        if (ContactChanged(user, phone, newEmail))
         {
-            // Quản lý bắt buộc có email đã xác minh; nhân viên được để trống (dùng email quản lý).
-            if (newEmail == null && role != Roles.Employee) return Fail(400, "Quản lý phải có email.");
-            if (newEmail != null)
+            if (string.IsNullOrWhiteSpace(dto.Code) || !await otp.VerifyAsync(user.Id, ChangePurpose(phone, newEmail), dto.Code))
+                return Fail(403, "Đổi email/số điện thoại cần mã OTP xác nhận đúng.");
+            user.PhoneNumber = phone;
+            if (!string.Equals(newEmail, user.Email, StringComparison.OrdinalIgnoreCase))
             {
-                var other = await users.FindByEmailAsync(newEmail);
-                if (other != null && other.Id != user.Id) return Fail(400, "Email đã được dùng bởi tài khoản khác.");
+                user.Email = newEmail;
+                // Đã xác nhận bằng OTP gửi tới số điện thoại nên email mới được coi là đã xác minh.
+                if (newEmail != null) user.EmailConfirmed = true;
             }
-            user.Email = newEmail;
-            user.EmailConfirmed = role == Roles.Employee || newEmail == null ? user.EmailConfirmed : user.GoogleSubject != null;
         }
+        if (!string.IsNullOrWhiteSpace(dto.FullName)) user.FullName = dto.FullName.Trim();
         var res = await users.UpdateAsync(user);
         if (!res.Succeeded) return Fail(400, string.Join(" ", res.Errors.Select(e => e.Description)));
         return Ok(await Profile(user));
     }
+
+    private async Task<(string? phone, string? email, IActionResult? error)> ParseChange(AppUser user, string role, UpdateProfileDto dto)
+    {
+        var phone = SmsSender.Normalize(dto.Phone);
+        if (!string.IsNullOrWhiteSpace(dto.Phone) && phone == null) return (null, null, Fail(400, "Số điện thoại không hợp lệ."));
+        var email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
+        if (email == null && role != Roles.Employee) return (null, null, Fail(400, "Quản lý phải có email."));
+        if (email != null && !string.Equals(email, user.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            var other = await users.FindByEmailAsync(email);
+            if (other != null && other.Id != user.Id) return (null, null, Fail(400, "Email đã được dùng bởi tài khoản khác."));
+        }
+        return (phone, email, null);
+    }
+
+    private static bool ContactChanged(AppUser user, string? phone, string? email) =>
+        phone != SmsSender.Normalize(user.PhoneNumber) || !string.Equals(email, user.Email, StringComparison.OrdinalIgnoreCase);
+
+    // Mã chỉ dùng được cho đúng cặp (email, số) đã yêu cầu.
+    private static string ChangePurpose(string? phone, string? email) =>
+        "profile-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes($"{phone}|{email?.ToLowerInvariant()}")))[..12];
 
     // ---- helpers ----
     private async Task<AppUser?> FindUser(string nameOrEmail) =>
