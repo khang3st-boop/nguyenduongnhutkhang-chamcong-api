@@ -121,6 +121,15 @@ def main():
     code = otp_for(memail, n)
     s, b = call("POST", "/api/Auth/verify-email", {"username": mgr, "code": code})
     check("verify-email đúng", s, 200, b)
+    s, b = call("POST", "/api/Auth/login", {"username": mgr, "password": "Pass@123"})
+    check("manager chưa được duyệt → 403 pendingApproval", s, 403, b)
+    at = login_flow(ADMIN_EMAIL, ADMIN_PASS, ADMIN_EMAIL)
+    s, b = call("GET", "/api/Approvals", token=at)
+    check("GET Approvals (admin)", s, 200, b)
+    pend = [x for x in (b if isinstance(b, list) else []) if x.get("userName") == mgr]
+    check("manager nằm trong danh sách chờ duyệt", len(pend), 1)
+    s, b = call("POST", f"/api/Approvals/{pend[0]['id']}/approve", token=at)
+    check("admin duyệt manager", s, 204, b)
     s, b = call("POST", "/api/Auth/login", {"username": mgr, "password": "sai"})
     check("login sai mật khẩu → 401", s, 401)
     time.sleep(31)  # giãn cách gửi lại OTP 30 giây
@@ -180,7 +189,13 @@ def main():
     s, b = call("POST", "/api/Auth/register", {"username": emp2, "password": "Pass@123", "fullName": "Nhân Viên B", "role": "employee", "inviteCode": "000000"})
     check("register nhân viên mã mời sai → 400", s, 400)
     s, b = call("POST", "/api/Auth/register", {"username": emp2, "password": "Pass@123", "fullName": "Nhân Viên B", "role": "employee", "inviteCode": invite})
+    check("register nhân viên thiếu email → 400", s, 400)
+    e2mail = f"emq{t}@example.com"
+    n = len(smtp_sink.MAILS)
+    s, b = call("POST", "/api/Auth/register", {"username": emp2, "password": "Pass@123", "fullName": "Nhân Viên B", "email": e2mail, "role": "employee", "inviteCode": invite})
     check("register nhân viên bằng mã mời", s, 200, b)
+    s, b = call("POST", "/api/Auth/verify-email", {"username": emp2, "code": otp_for(e2mail, n)})
+    check("verify-email nhân viên", s, 200, b)
     s, b = call("POST", "/api/Auth/register", {"username": emp2 + "x", "password": "Pass@123", "fullName": "C", "role": "employee", "inviteCode": invite})
     check("mã mời dùng lại → 400", s, 400)
 
@@ -188,6 +203,34 @@ def main():
     et = login_flow(emp, "Pass@123", memail)
     s, b = call("GET", "/api/Auth/me", token=et)
     check("me.role = Employee", b.get("role") if isinstance(b, dict) else None, "Employee")
+
+    # ---- Dịch (item f), phòng họp video, đổi thông tin, gửi lại OTP ----
+    s, b = call("POST", "/api/Translate", {"texts": ["Hello"], "target": "vi"}, et)
+    check("POST Translate", s, [200, 502], b)
+    s, b = call("POST", "/api/Translate", {"texts": ["Hello"], "target": "xx"}, et)
+    check("Translate ngôn ngữ sai → 400", s, 400)
+    s, b = call("POST", "/api/Translate", {"texts": ["Hello"], "target": "vi"})
+    check("Translate không token → 401", s, 401)
+    s, b = call("GET", "/api/Rooms", token=et)
+    check("GET Rooms (có Phòng chung)", s, 200, b)
+    gen = b[0]["channel"] if isinstance(b, list) and b else ""
+    s, b = call("POST", "/api/Rooms", {"name": "Phòng dự án"}, et)
+    check("POST Room", s, 200, b)
+    rid, rch = b["id"], b["channel"]
+    s, b = call("PUT", f"/api/Rooms/{rid}", {"name": "Phòng dự án 2"}, et)
+    check("PUT Room (người tạo)", s, 204, b)
+    s, b = call("POST", "/api/Rooms/ping", {"channel": rch}, et)
+    check("Rooms ping", s, 204, b)
+    s, b = call("POST", "/api/Rooms/ping", {"channel": "team-999999-x"}, et)
+    check("Rooms ping kênh công ty khác → 403", s, 403)
+    s, b = call("POST", "/api/Rooms/leave", {"channel": rch}, et)
+    check("Rooms leave", s, 204, b)
+    s, b = call("DELETE", f"/api/Rooms/{rid}", token=et)
+    check("DELETE Room", s, 204, b)
+    s, b = call("POST", "/api/Auth/me/request-change", {"fullName": "Nhân Viên A3"}, et)
+    check("request-change chỉ đổi tên (không cần OTP)", s, 200, b)
+    s, b = call("POST", "/api/Auth/resend-login-otp", {"username": emp})
+    check("resend-login-otp", s, [200, 429], b)
 
     # ---- Đăng nhập bằng SMS OTP ----
     time.sleep(31)
