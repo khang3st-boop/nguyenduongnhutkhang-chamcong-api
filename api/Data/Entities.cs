@@ -121,3 +121,13 @@ public class BlockedSite
     public string Domain { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+
+/// <summary>Mã liên kết 6 số để trẻ tự đăng ký vào đúng gia đình. Dùng một lần, hết hạn sau 24 giờ.</summary>
+public class FamilyInvite
+{
+    public int Id { get; set; }
+    public int FamilyId { get; set; }
+    public string Code { get; set; } = "";
+    public DateTime ExpiresAt { get; set; }
+    public DateTime? UsedAt { get; set; }
+}

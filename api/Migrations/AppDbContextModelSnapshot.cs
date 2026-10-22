@@ -392,6 +392,35 @@ namespace NguyenDuongNhutKhang_app.Migrations
                     b.ToTable("Families");
                 });
 
+            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.FamilyInvite", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("nvarchar(6)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("FamilyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code");
+
+                    b.ToTable("FamilyInvites");
+                });
+
             modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.LocationPoint", b =>
                 {
                     b.Property<long>("Id")

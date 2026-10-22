@@ -14,6 +14,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<TranslationRecord> Translations => Set<TranslationRecord>();
     public DbSet<OtpCode> OtpCodes => Set<OtpCode>();
     public DbSet<BlockedSite> BlockedSites => Set<BlockedSite>();
+    public DbSet<FamilyInvite> FamilyInvites => Set<FamilyInvite>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -35,6 +36,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         b.Entity<TranslationRecord>().HasIndex(t => new { t.FamilyId, t.CreatedAt });
         b.Entity<BlockedSite>().Property(x => x.Domain).HasMaxLength(200);
         b.Entity<BlockedSite>().HasIndex(x => new { x.FamilyId, x.ChildId });
+        b.Entity<FamilyInvite>().Property(x => x.Code).HasMaxLength(6);
+        b.Entity<FamilyInvite>().HasIndex(x => x.Code);
         b.Entity<OtpCode>().HasIndex(o => new { o.UserId, o.Purpose });
     }
 }

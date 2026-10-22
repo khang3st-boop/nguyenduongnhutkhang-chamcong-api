@@ -12,9 +12,11 @@ namespace NguyenDuongNhutKhang_app.Controllers;
 
 public record RegisterDto(
     [Required, StringLength(40, MinimumLength = 3), RegularExpression(@"^[A-Za-z0-9_.]+$")] string Username,
-    [Required, EmailAddress] string Email,
+    [EmailAddress] string? Email,
     [Required, MinLength(6)] string Password,
-    [Required, StringLength(120)] string FullName);
+    [Required, StringLength(120)] string FullName,
+    [RegularExpression("^(parent|child)$")] string? Role = null,
+    [StringLength(6, MinimumLength = 6)] string? InviteCode = null);
 
 public record LoginDto([Required] string Username, [Required] string Password);
 public record OtpDto([Required] string Username, [Required, StringLength(6, MinimumLength = 6)] string Code);
@@ -31,6 +33,8 @@ public class AuthController(
     public async Task<IActionResult> Register(RegisterDto dto)
     {
         if (await users.FindByNameAsync(dto.Username) != null) return Fail(400, "Tên đăng nhập đã tồn tại.");
+        if (dto.Role == "child") return await RegisterChild(dto);
+        if (string.IsNullOrWhiteSpace(dto.Email)) return Fail(400, "Vui lòng nhập email.");
         if (await users.FindByEmailAsync(dto.Email) != null) return Fail(400, "Email đã được đăng ký.");
 
         var user = new AppUser { UserName = dto.Username, Email = dto.Email, FullName = dto.FullName.Trim() };
@@ -48,6 +52,23 @@ public class AuthController(
         var sent = await SendOtp(user, "verify-email", user.Email!, "xác minh email");
         if (sent is not null) return sent;
         return Ok(new { status = true, message = "Đã gửi mã xác minh tới email.", requiresEmailVerification = true });
+    }
+
+    // Trẻ tự đăng ký bằng mã liên kết 6 số của phụ huynh; mã OTP đăng nhập sẽ gửi về email phụ huynh.
+    private async Task<IActionResult> RegisterChild(RegisterDto dto)
+    {
+        var invite = string.IsNullOrEmpty(dto.InviteCode) ? null
+            : await db.FamilyInvites.FirstOrDefaultAsync(i => i.Code == dto.InviteCode && i.UsedAt == null && i.ExpiresAt > DateTime.UtcNow);
+        if (invite == null) return Fail(400, "Mã liên kết không đúng hoặc đã hết hạn. Hãy nhờ phụ huynh tạo mã mới.");
+
+        var kid = new AppUser { UserName = dto.Username, FullName = dto.FullName.Trim(), EmailConfirmed = true, FamilyId = invite.FamilyId };
+        var created = await users.CreateAsync(kid, dto.Password);
+        if (!created.Succeeded)
+            return BadRequest(new { status = false, message = string.Join(" ", created.Errors.Select(e => e.Description)) });
+        await users.AddToRoleAsync(kid, Roles.Child);
+        invite.UsedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return Ok(new { status = true, message = "Đăng ký thành công. Hãy đăng nhập.", requiresEmailVerification = false });
     }
 
     [HttpPost("verify-email")]
@@ -213,7 +234,7 @@ public class AuthController(
         }
         catch (Exception ex)
         {
-            log.LogError("Gửi email OTP thất bại: {Type}", ex.GetType().Name);
+            log.LogError("Gửi email OTP thất bại: {Type}: {Message}", ex.GetType().Name, ex.Message);
             return Fail(502, "Không gửi được email OTP. Kiểm tra cấu hình SMTP.");
         }
     }
