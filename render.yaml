@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: kidguard-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: ./api
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: Database__Provider
+        value: Postgres
+      - key: ConnectionStrings__DefaultConnection   # chuỗi kết nối Neon, dạng Npgsql
+        sync: false
+      - key: JWTKey__Secret
+        generateValue: true
+      - key: Brevo__ApiKey
+        sync: false
+      - key: Brevo__SenderEmail
+        sync: false
+      - key: Google__ClientIds__0
+        sync: false
+      - key: Agora__AppId
+        sync: false
+      - key: Agora__AppCertificate
+        sync: false
+      - key: Admin__Email
+        sync: false
+      - key: Admin__Password
+        sync: false

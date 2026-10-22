@@ -1,0 +1,44 @@
+# Chạy trên VPS: docker compose up -d --build   (cần file .env cùng thư mục, xem .env.example)
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kidguard
+      POSTGRES_USER: kidguard
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+
+  api:
+    build: ../api
+    restart: unless-stopped
+    depends_on: [db]
+    environment:
+      Database__Provider: Postgres
+      ConnectionStrings__DefaultConnection: Host=db;Database=kidguard;Username=kidguard;Password=${DB_PASSWORD}
+      JWTKey__Secret: ${JWT_SECRET}
+      Smtp__User: ${SMTP_USER}
+      Smtp__Password: ${SMTP_PASSWORD}
+      Google__ClientIds__0: ${GOOGLE_WEB_CLIENT_ID}
+      Agora__AppId: ${AGORA_APP_ID}
+      Agora__AppCertificate: ${AGORA_APP_CERTIFICATE}
+      Admin__Email: ${ADMIN_EMAIL}
+      Admin__Password: ${ADMIN_PASSWORD}
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [api]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+
+volumes:
+  dbdata:
+  caddydata:

@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+*.user
+.env
+*.key
+*.pem
+appsettings.Development.json
+api/wwwroot/uploads/
