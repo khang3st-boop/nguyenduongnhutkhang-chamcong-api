@@ -134,8 +134,9 @@ app.UseExceptionHandler(e => e.Run(async ctx =>
 
 app.UseSwagger();
 app.UseSwaggerUI();
-app.MapGet("/", () => Results.Redirect("/swagger"));
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+// UptimeRobot (gói miễn phí) kiểm tra bằng HEAD, nên cho cả HEAD để không báo "Down" nhầm.
+app.MapMethods("/", ["GET", "HEAD"], () => Results.Redirect("/swagger"));
+app.MapMethods("/health", ["GET", "HEAD"], () => Results.Ok(new { status = "ok" }));
 app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
