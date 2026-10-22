@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: kidguard-api
+    name: chamcong-api
     runtime: docker
     plan: free
     dockerfilePath: ./api/Dockerfile

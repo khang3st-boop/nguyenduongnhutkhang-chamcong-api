@@ -15,7 +15,7 @@ public record RegisterDto(
     [EmailAddress] string? Email,
     [Required, MinLength(6)] string Password,
     [Required, StringLength(120)] string FullName,
-    [RegularExpression("^(parent|child)$")] string? Role = null,
+    [RegularExpression("^(manager|employee)$")] string? Role = null,
     [StringLength(6, MinimumLength = 6)] string? InviteCode = null);
 
 public record LoginDto([Required] string Username, [Required] string Password);
@@ -28,12 +28,12 @@ public class AuthController(
     UserManager<AppUser> users, AppDbContext db, OtpService otp, EmailSender email, JwtService jwt,
     IOptions<GoogleOptions> google, ILogger<AuthController> log) : ApiBase
 {
-    // POST api/Auth/register : đăng ký phụ huynh qua email, gửi OTP xác minh email
+    // POST api/Auth/register : đăng ký quản lý qua email, gửi OTP xác minh email
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterDto dto)
     {
         if (await users.FindByNameAsync(dto.Username) != null) return Fail(400, "Tên đăng nhập đã tồn tại.");
-        if (dto.Role == "child") return await RegisterChild(dto);
+        if (dto.Role == "employee") return await RegisterEmployee(dto);
         if (string.IsNullOrWhiteSpace(dto.Email)) return Fail(400, "Vui lòng nhập email.");
         if (await users.FindByEmailAsync(dto.Email) != null) return Fail(400, "Email đã được đăng ký.");
 
@@ -42,33 +42,33 @@ public class AuthController(
         if (!created.Succeeded)
             return BadRequest(new { status = false, message = string.Join(" ", created.Errors.Select(e => e.Description)) });
 
-        var family = new Family { Name = $"Gia đình {user.FullName}", OwnerId = user.Id };
-        db.Families.Add(family);
+        var company = new Company { Name = $"Công ty của {user.FullName}", OwnerId = user.Id };
+        db.Companies.Add(company);
         await db.SaveChangesAsync();
-        user.FamilyId = family.Id;
+        user.CompanyId = company.Id;
         await users.UpdateAsync(user);
-        await users.AddToRoleAsync(user, Roles.Parent);
+        await users.AddToRoleAsync(user, Roles.Manager);
 
         var sent = await SendOtp(user, "verify-email", user.Email!, "xác minh email");
         if (sent is not null) return sent;
         return Ok(new { status = true, message = "Đã gửi mã xác minh tới email.", requiresEmailVerification = true });
     }
 
-    // Trẻ tự đăng ký bằng mã liên kết 6 số của phụ huynh; mã OTP đăng nhập sẽ gửi về email phụ huynh.
-    private async Task<IActionResult> RegisterChild(RegisterDto dto)
+    // Nhân viên tự đăng ký bằng mã mời 6 số của quản lý; OTP đăng nhập gửi về email nhân viên (nếu có) hoặc email quản lý.
+    private async Task<IActionResult> RegisterEmployee(RegisterDto dto)
     {
         var invite = string.IsNullOrEmpty(dto.InviteCode) ? null
-            : await db.FamilyInvites.FirstOrDefaultAsync(i => i.Code == dto.InviteCode && i.UsedAt == null && i.ExpiresAt > DateTime.UtcNow);
-        if (invite == null) return Fail(400, "Mã liên kết không đúng hoặc đã hết hạn. Hãy nhờ phụ huynh tạo mã mới.");
+            : await db.CompanyInvites.FirstOrDefaultAsync(i => i.Code == dto.InviteCode && i.UsedAt == null && i.ExpiresAt > DateTime.UtcNow);
+        if (invite == null) return Fail(400, "Mã mời không đúng hoặc đã hết hạn. Hãy nhờ quản lý tạo mã mới.");
 
-        var kid = new AppUser { UserName = dto.Username, FullName = dto.FullName.Trim(), EmailConfirmed = true, FamilyId = invite.FamilyId };
-        var created = await users.CreateAsync(kid, dto.Password);
+        var emp = new AppUser { UserName = dto.Username, FullName = dto.FullName.Trim(), EmailConfirmed = true, CompanyId = invite.CompanyId };
+        var created = await users.CreateAsync(emp, dto.Password);
         if (!created.Succeeded)
             return BadRequest(new { status = false, message = string.Join(" ", created.Errors.Select(e => e.Description)) });
-        await users.AddToRoleAsync(kid, Roles.Child);
+        await users.AddToRoleAsync(emp, Roles.Employee);
         invite.UsedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
-        return Ok(await Session(kid));
+        return Ok(await Session(emp));
     }
 
     [HttpPost("verify-email")]
@@ -106,7 +106,7 @@ public class AuthController(
         await users.ResetAccessFailedCountAsync(user);
 
         var role = (await users.GetRolesAsync(user)).FirstOrDefault() ?? "";
-        if (role != Roles.Child && !user.EmailConfirmed)
+        if (role != Roles.Employee && !user.EmailConfirmed)
         {
             await SendOtp(user, "verify-email", user.Email!, "xác minh email");
             return StatusCode(403, new { status = false, message = "Email chưa được xác minh. Đã gửi mã mới.", needsEmailVerification = true, username = user.UserName });
@@ -172,12 +172,12 @@ public class AuthController(
             };
             var created = await users.CreateAsync(user);
             if (!created.Succeeded) return Fail(400, string.Join(" ", created.Errors.Select(e => e.Description)));
-            var family = new Family { Name = $"Gia đình {user.FullName}", OwnerId = user.Id };
-            db.Families.Add(family);
+            var company = new Company { Name = $"Công ty của {user.FullName}", OwnerId = user.Id };
+            db.Companies.Add(company);
             await db.SaveChangesAsync();
-            user.FamilyId = family.Id;
+            user.CompanyId = company.Id;
             await users.UpdateAsync(user);
-            await users.AddToRoleAsync(user, Roles.Parent);
+            await users.AddToRoleAsync(user, Roles.Manager);
         }
         else
         {
@@ -209,16 +209,16 @@ public class AuthController(
     private async Task<object> Profile(AppUser user) => new
     {
         id = user.Id, userName = user.UserName, fullName = user.FullName, email = user.Email,
-        avatarUrl = user.AvatarUrl, familyId = user.FamilyId,
+        avatarUrl = user.AvatarUrl, companyId = user.CompanyId,
         role = (await users.GetRolesAsync(user)).FirstOrDefault()
     };
 
-    // Trẻ em không bắt buộc có email: mã OTP gửi về email của phụ huynh chủ gia đình.
+    // Nhân viên không bắt buộc có email: OTP gửi về email của quản lý chủ công ty.
     private async Task<string?> OtpTarget(AppUser user, string role)
     {
         if (!string.IsNullOrWhiteSpace(user.Email)) return user.Email;
-        if (role != Roles.Child || user.FamilyId == null) return null;
-        var ownerId = await db.Families.Where(f => f.Id == user.FamilyId).Select(f => f.OwnerId).FirstOrDefaultAsync();
+        if (role != Roles.Employee || user.CompanyId == null) return null;
+        var ownerId = await db.Companies.Where(f => f.Id == user.CompanyId).Select(f => f.OwnerId).FirstOrDefaultAsync();
         return ownerId == null ? null : (await users.FindByIdAsync(ownerId))?.Email;
     }
 

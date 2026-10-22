@@ -1,22 +1,23 @@
-# KidGuard - nguyenduongnhutkhang_app
+# Chấm công nhân viên - nguyenduongnhutkhang_app
 
-Backend: `api/` (.NET 10, SQL Server). Flutter app: `C:\Users\MY PC\StudioProjects\nguyenduongnhutkhang_app`.
+REST API (ASP.NET Core .NET 10, EF Core, Identity, JWT) cho ứng dụng chấm công. Mọi chức năng của app Flutter đều đi qua API này.
 
-## Cấu hình bắt buộc (user-secrets, KHÔNG commit)
-Chạy trong thư mục `api`:
+## Chức năng
+- Đăng ký bằng email (OTP) hoặc Google OAuth2; đăng nhập username + mật khẩu + OTP email.
+- Phân quyền: **Admin** (hệ thống), **Manager** (quản lý công ty), **Employee** (nhân viên).
+- CRUD: nhân viên, địa điểm làm việc, lượt chấm công, tin nhắn.
+- **Chấm công bằng quét QR** xoay vòng 30 giây (HMAC) + kiểm tra GPS trong bán kính địa điểm (chống chấm hộ).
+- **Chia sẻ vị trí GPS** của nhân viên cho quản lý.
+- **Video call nhóm** 4-5 người (Agora).
+- Báo cáo tháng: ngày công, đi trễ, về sớm, tổng giờ.
 
-    dotnet user-secrets set "Smtp:User" "<gmail>"
-    dotnet user-secrets set "Smtp:Password" "<Gmail App Password 16 ký tự>"
-    dotnet user-secrets set "Google:ClientIds:0" "<Web client ID>.apps.googleusercontent.com"
-    dotnet user-secrets set "Agora:AppId" "<Agora App ID>"
-    dotnet user-secrets set "Agora:AppCertificate" "<Agora App Certificate>"
-    dotnet user-secrets set "Admin:Email" "<email thật của admin>"
-    dotnet user-secrets set "Admin:Password" "<mật khẩu admin>"
+## Cấu hình (biến môi trường)
+`ConnectionStrings__DefaultConnection`, `Database__Provider` (Postgres|SqlServer), `JWTKey__Secret`, `Admin__Email`, `Admin__Password`,
+`Brevo__ApiKey`, `Google__ClientIds__0`, `Agora__AppId`, `Agora__AppCertificate`, `PORT`.
 
-Admin hiện đang là email giả `admin@example.invalid` nên chưa nhận được OTP: đặt lại Admin:Email thật và xóa user `admin` trong DB để seed lại.
+Lưu ý: cơ sở dữ liệu phải **trống** (Postgres tự tạo bảng khi khởi động).
 
 ## Chạy
-    cd api && dotnet run --launch-profile http        # http://0.0.0.0:5300 (Swagger tại /)
-    flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5300 --dart-define=GOOGLE_SERVER_CLIENT_ID=<Web client ID>
-
-Điện thoại thật: dùng IP LAN của máy chạy API. Đăng nhập Google Android cần tạo OAuth client Android (package `com.nguyenduongnhutkhang.nguyenduongnhutkhang_app` + SHA-1).
+```
+cd api && dotnet run
+```

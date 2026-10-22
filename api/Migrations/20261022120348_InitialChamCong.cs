@@ -6,33 +6,11 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace NguyenDuongNhutKhang_app.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialKidGuard : Migration
+    public partial class InitialChamCong : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "Alerts",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    FamilyId = table.Column<int>(type: "int", nullable: false),
-                    ChildId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Type = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Message = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
-                    Latitude = table.Column<double>(type: "float", nullable: true),
-                    Longitude = table.Column<double>(type: "float", nullable: true),
-                    Battery = table.Column<int>(type: "int", nullable: true),
-                    ImageUrl = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: true),
-                    IsResolved = table.Column<bool>(type: "bit", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Alerts", x => x.Id);
-                });
-
             migrationBuilder.CreateTable(
                 name: "AspNetRoles",
                 columns: table => new
@@ -54,8 +32,10 @@ namespace NguyenDuongNhutKhang_app.Migrations
                     Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     FullName = table.Column<string>(type: "nvarchar(120)", maxLength: 120, nullable: false),
                     AvatarUrl = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    FamilyId = table.Column<int>(type: "int", nullable: true),
+                    CompanyId = table.Column<int>(type: "int", nullable: true),
                     GoogleSubject = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Position = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: true),
+                    Department = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
@@ -78,7 +58,32 @@ namespace NguyenDuongNhutKhang_app.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Families",
+                name: "Attendances",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CompanyId = table.Column<int>(type: "int", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    WorkplaceId = table.Column<int>(type: "int", nullable: false),
+                    CheckIn = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CheckOut = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    InLat = table.Column<double>(type: "float", nullable: true),
+                    InLng = table.Column<double>(type: "float", nullable: true),
+                    OutLat = table.Column<double>(type: "float", nullable: true),
+                    OutLng = table.Column<double>(type: "float", nullable: true),
+                    Status = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    LateMinutes = table.Column<int>(type: "int", nullable: false),
+                    EarlyLeaveMinutes = table.Column<int>(type: "int", nullable: false),
+                    Note = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Attendances", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Companies",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
@@ -89,7 +94,23 @@ namespace NguyenDuongNhutKhang_app.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Families", x => x.Id);
+                    table.PrimaryKey("PK_Companies", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "CompanyInvites",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CompanyId = table.Column<int>(type: "int", nullable: false),
+                    Code = table.Column<string>(type: "nvarchar(6)", maxLength: 6, nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UsedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CompanyInvites", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -116,7 +137,7 @@ namespace NguyenDuongNhutKhang_app.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    FamilyId = table.Column<int>(type: "int", nullable: false),
+                    CompanyId = table.Column<int>(type: "int", nullable: false),
                     SenderId = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Kind = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     Text = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: false),
@@ -148,54 +169,25 @@ namespace NguyenDuongNhutKhang_app.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "SafeZones",
+                name: "Workplaces",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    FamilyId = table.Column<int>(type: "int", nullable: false),
+                    CompanyId = table.Column<int>(type: "int", nullable: false),
                     Name = table.Column<string>(type: "nvarchar(120)", maxLength: 120, nullable: false),
                     Latitude = table.Column<double>(type: "float", nullable: false),
                     Longitude = table.Column<double>(type: "float", nullable: false),
                     RadiusMeters = table.Column<double>(type: "float", nullable: false),
+                    StartMinute = table.Column<int>(type: "int", nullable: false),
+                    EndMinute = table.Column<int>(type: "int", nullable: false),
+                    GraceMinutes = table.Column<int>(type: "int", nullable: false),
+                    QrSecret = table.Column<string>(type: "nvarchar(64)", maxLength: 64, nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_SafeZones", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "Translations",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    FamilyId = table.Column<int>(type: "int", nullable: false),
-                    ChildId = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Kind = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    SourceLang = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    TargetLang = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    SourceText = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: false),
-                    TranslatedText = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_Translations", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "ZoneStates",
-                columns: table => new
-                {
-                    UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    ZoneId = table.Column<int>(type: "int", nullable: false),
-                    Inside = table.Column<bool>(type: "bit", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ZoneStates", x => new { x.UserId, x.ZoneId });
+                    table.PrimaryKey("PK_Workplaces", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -305,11 +297,6 @@ namespace NguyenDuongNhutKhang_app.Migrations
                 });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Alerts_FamilyId_CreatedAt",
-                table: "Alerts",
-                columns: new[] { "FamilyId", "CreatedAt" });
-
-            migrationBuilder.CreateIndex(
                 name: "IX_AspNetRoleClaims_RoleId",
                 table: "AspNetRoleClaims",
                 column: "RoleId");
@@ -342,9 +329,9 @@ namespace NguyenDuongNhutKhang_app.Migrations
                 column: "NormalizedEmail");
 
             migrationBuilder.CreateIndex(
-                name: "IX_AspNetUsers_FamilyId",
+                name: "IX_AspNetUsers_CompanyId",
                 table: "AspNetUsers",
-                column: "FamilyId");
+                column: "CompanyId");
 
             migrationBuilder.CreateIndex(
                 name: "UserNameIndex",
@@ -354,14 +341,29 @@ namespace NguyenDuongNhutKhang_app.Migrations
                 filter: "[NormalizedUserName] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Attendances_CompanyId_CheckIn",
+                table: "Attendances",
+                columns: new[] { "CompanyId", "CheckIn" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Attendances_UserId_CheckIn",
+                table: "Attendances",
+                columns: new[] { "UserId", "CheckIn" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CompanyInvites_Code",
+                table: "CompanyInvites",
+                column: "Code");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Locations_UserId_CreatedAt",
                 table: "Locations",
                 columns: new[] { "UserId", "CreatedAt" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_Messages_FamilyId_Id",
+                name: "IX_Messages_CompanyId_Id",
                 table: "Messages",
-                columns: new[] { "FamilyId", "Id" });
+                columns: new[] { "CompanyId", "Id" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_OtpCodes_UserId_Purpose",
@@ -369,22 +371,14 @@ namespace NguyenDuongNhutKhang_app.Migrations
                 columns: new[] { "UserId", "Purpose" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_SafeZones_FamilyId",
-                table: "SafeZones",
-                column: "FamilyId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Translations_FamilyId_CreatedAt",
-                table: "Translations",
-                columns: new[] { "FamilyId", "CreatedAt" });
+                name: "IX_Workplaces_CompanyId",
+                table: "Workplaces",
+                column: "CompanyId");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "Alerts");
-
             migrationBuilder.DropTable(
                 name: "AspNetRoleClaims");
 
@@ -401,7 +395,13 @@ namespace NguyenDuongNhutKhang_app.Migrations
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
-                name: "Families");
+                name: "Attendances");
+
+            migrationBuilder.DropTable(
+                name: "Companies");
+
+            migrationBuilder.DropTable(
+                name: "CompanyInvites");
 
             migrationBuilder.DropTable(
                 name: "Locations");
@@ -413,13 +413,7 @@ namespace NguyenDuongNhutKhang_app.Migrations
                 name: "OtpCodes");
 
             migrationBuilder.DropTable(
-                name: "SafeZones");
-
-            migrationBuilder.DropTable(
-                name: "Translations");
-
-            migrationBuilder.DropTable(
-                name: "ZoneStates");
+                name: "Workplaces");
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");

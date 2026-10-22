@@ -7,7 +7,7 @@ public class SmtpOptions
     public string User { get; set; } = "";
     public string Password { get; set; } = "";
     public string Security { get; set; } = "StartTls"; // StartTls | Ssl | None (None chỉ dùng cho SMTP nội bộ khi kiểm thử)
-    public string FromName { get; set; } = "KidGuard";
+    public string FromName { get; set; } = "ChamCong";
     public bool Configured => !string.IsNullOrWhiteSpace(User) && !string.IsNullOrWhiteSpace(Password);
 }
 
@@ -16,7 +16,7 @@ public class BrevoOptions
 {
     public string ApiKey { get; set; } = "";
     public string SenderEmail { get; set; } = "";
-    public string SenderName { get; set; } = "KidGuard";
+    public string SenderName { get; set; } = "ChamCong";
     public bool Configured => !string.IsNullOrWhiteSpace(ApiKey) && !string.IsNullOrWhiteSpace(SenderEmail);
 }
 

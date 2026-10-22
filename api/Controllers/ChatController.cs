@@ -8,8 +8,8 @@ namespace NguyenDuongNhutKhang_app.Controllers;
 
 public record TextDto([Required, StringLength(2000, MinimumLength = 1)] string Text);
 
-/// <summary>Nhắn tin gia đình (CRUD). Cuộc gọi video nhóm được mời qua một tin nhắn loại "call".</summary>
-[Authorize(Roles = $"{Roles.Parent},{Roles.Child}"), Route("api/[controller]")]
+/// <summary>Nhắn tin nội bộ công ty (CRUD). Cuộc gọi video nhóm được mời qua một tin nhắn loại "call".</summary>
+[Authorize(Roles = $"{Roles.Manager},{Roles.Employee}"), Route("api/[controller]")]
 public class ChatController(AppDbContext db) : ApiBase
 {
     [HttpGet]
@@ -17,7 +17,7 @@ public class ChatController(AppDbContext db) : ApiBase
     {
         var rows = await (from m in db.Messages
                           join u in db.Users on m.SenderId equals u.Id
-                          where m.FamilyId == FamilyId && m.Id > afterId
+                          where m.CompanyId == CompanyId && m.Id > afterId
                           orderby m.Id descending
                           select new
                           {
@@ -31,7 +31,7 @@ public class ChatController(AppDbContext db) : ApiBase
     [HttpPost]
     public async Task<IActionResult> Send(TextDto dto)
     {
-        var m = new ChatMessage { FamilyId = FamilyId, SenderId = UserId, Text = dto.Text.Trim() };
+        var m = new ChatMessage { CompanyId = CompanyId, SenderId = UserId, Text = dto.Text.Trim() };
         db.Messages.Add(m);
         await db.SaveChangesAsync();
         return Ok(new { m.Id });
@@ -42,10 +42,10 @@ public class ChatController(AppDbContext db) : ApiBase
     public async Task<IActionResult> StartCall()
     {
         var me = await db.Users.Where(u => u.Id == UserId).Select(u => u.FullName).FirstAsync();
-        var channel = $"family-{FamilyId}-{Guid.NewGuid():N}"[..24];
+        var channel = $"team-{CompanyId}-{Guid.NewGuid():N}"[..24];
         var m = new ChatMessage
         {
-            FamilyId = FamilyId, SenderId = UserId, Kind = "call", Channel = channel,
+            CompanyId = CompanyId, SenderId = UserId, Kind = "call", Channel = channel,
             Text = $"{me} đã bắt đầu cuộc gọi video nhóm."
         };
         db.Messages.Add(m);
@@ -56,7 +56,7 @@ public class ChatController(AppDbContext db) : ApiBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Edit(int id, TextDto dto)
     {
-        var m = await db.Messages.FirstOrDefaultAsync(x => x.Id == id && x.FamilyId == FamilyId && x.SenderId == UserId && x.Kind == "text");
+        var m = await db.Messages.FirstOrDefaultAsync(x => x.Id == id && x.CompanyId == CompanyId && x.SenderId == UserId && x.Kind == "text");
         if (m == null) return NotFound();
         m.Text = dto.Text.Trim();
         m.EditedAt = DateTime.UtcNow;
@@ -67,8 +67,8 @@ public class ChatController(AppDbContext db) : ApiBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
-        var m = await db.Messages.FirstOrDefaultAsync(x => x.Id == id && x.FamilyId == FamilyId);
-        if (m == null || (m.SenderId != UserId && Role != Roles.Parent)) return NotFound();
+        var m = await db.Messages.FirstOrDefaultAsync(x => x.Id == id && x.CompanyId == CompanyId);
+        if (m == null || (m.SenderId != UserId && Role != Roles.Manager)) return NotFound();
         db.Messages.Remove(m);
         await db.SaveChangesAsync();
         return NoContent();

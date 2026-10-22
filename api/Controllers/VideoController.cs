@@ -11,8 +11,8 @@ namespace NguyenDuongNhutKhang_app.Controllers;
 
 public record VideoTokenDto([Required] string Channel);
 
-/// <summary>Cấp token Agora để vào phòng gọi video nhóm của đúng gia đình.</summary>
-[Authorize(Roles = $"{Roles.Parent},{Roles.Child}"), Route("api/[controller]")]
+/// <summary>Cấp token Agora để vào phòng gọi video nhóm của đúng công ty.</summary>
+[Authorize(Roles = $"{Roles.Manager},{Roles.Employee}"), Route("api/[controller]")]
 public class VideoController(IOptions<AgoraOptions> options) : ApiBase
 {
     [HttpPost("token")]
@@ -20,7 +20,7 @@ public class VideoController(IOptions<AgoraOptions> options) : ApiBase
     {
         var o = options.Value;
         if (string.IsNullOrWhiteSpace(o.AppId)) return Fail(503, "Máy chủ chưa cấu hình Agora AppId.");
-        if (!dto.Channel.StartsWith($"family-{FamilyId}") || dto.Channel.Length > 64) return Fail(403, "Không có quyền vào phòng này.");
+        if (!dto.Channel.StartsWith($"team-{CompanyId}") || dto.Channel.Length > 64) return Fail(403, "Không có quyền vào phòng này.");
 
         var uid = BitConverter.ToUInt32(SHA256.HashData(Encoding.UTF8.GetBytes(UserId)), 0) & 0x7FFFFFFF;
         if (uid == 0) uid = 1;

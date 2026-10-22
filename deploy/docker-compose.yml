@@ -4,8 +4,8 @@ services:
     image: postgres:16
     restart: unless-stopped
     environment:
-      POSTGRES_DB: kidguard
-      POSTGRES_USER: kidguard
+      POSTGRES_DB: chamcong
+      POSTGRES_USER: chamcong
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - dbdata:/var/lib/postgresql/data
@@ -16,7 +16,7 @@ services:
     depends_on: [db]
     environment:
       Database__Provider: Postgres
-      ConnectionStrings__DefaultConnection: Host=db;Database=kidguard;Username=kidguard;Password=${DB_PASSWORD}
+      ConnectionStrings__DefaultConnection: Host=db;Database=chamcong;Username=chamcong;Password=${DB_PASSWORD}
       JWTKey__Secret: ${JWT_SECRET}
       Smtp__User: ${SMTP_USER}
       Smtp__Password: ${SMTP_PASSWORD}

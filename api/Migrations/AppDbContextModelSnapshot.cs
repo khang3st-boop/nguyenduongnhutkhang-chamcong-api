@@ -155,56 +155,6 @@ namespace NguyenDuongNhutKhang_app.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.Alert", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("Battery")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ChildId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("FamilyId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("ImageUrl")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
-
-                    b.Property<bool>("IsResolved")
-                        .HasColumnType("bit");
-
-                    b.Property<double?>("Latitude")
-                        .HasColumnType("float");
-
-                    b.Property<double?>("Longitude")
-                        .HasColumnType("float");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FamilyId", "CreatedAt");
-
-                    b.ToTable("Alerts");
-                });
-
             modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.AppUser", b =>
                 {
                     b.Property<string>("Id")
@@ -216,8 +166,8 @@ namespace NguyenDuongNhutKhang_app.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateOnly?>("BirthDate")
-                        .HasColumnType("date");
+                    b.Property<int?>("CompanyId")
+                        .HasColumnType("int");
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -226,6 +176,10 @@ namespace NguyenDuongNhutKhang_app.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Department")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
@@ -233,16 +187,10 @@ namespace NguyenDuongNhutKhang_app.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
-                    b.Property<int?>("FamilyId")
-                        .HasColumnType("int");
-
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("nvarchar(120)");
-
-                    b.Property<string>("Gender")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("GoogleSubject")
                         .HasColumnType("nvarchar(max)");
@@ -270,6 +218,10 @@ namespace NguyenDuongNhutKhang_app.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Position")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
 
@@ -282,7 +234,7 @@ namespace NguyenDuongNhutKhang_app.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FamilyId");
+                    b.HasIndex("CompanyId");
 
                     b.HasIndex("NormalizedEmail")
                         .HasDatabaseName("EmailIndex");
@@ -295,7 +247,7 @@ namespace NguyenDuongNhutKhang_app.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.BlockedSite", b =>
+            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.Attendance", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -303,25 +255,56 @@ namespace NguyenDuongNhutKhang_app.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("ChildId")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTime>("CheckIn")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Domain")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                    b.Property<DateTime?>("CheckOut")
+                        .HasColumnType("datetime2");
 
-                    b.Property<int>("FamilyId")
+                    b.Property<int>("CompanyId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("EarlyLeaveMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<double?>("InLat")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("InLng")
+                        .HasColumnType("float");
+
+                    b.Property<int>("LateMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<double?>("OutLat")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("OutLng")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("WorkplaceId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FamilyId", "ChildId");
+                    b.HasIndex("CompanyId", "CheckIn");
 
-                    b.ToTable("BlockedSites");
+                    b.HasIndex("UserId", "CheckIn");
+
+                    b.ToTable("Attendances");
                 });
 
             modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.ChatMessage", b =>
@@ -335,14 +318,14 @@ namespace NguyenDuongNhutKhang_app.Migrations
                     b.Property<string>("Channel")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("CompanyId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("EditedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("FamilyId")
-                        .HasColumnType("int");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -359,12 +342,12 @@ namespace NguyenDuongNhutKhang_app.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FamilyId", "Id");
+                    b.HasIndex("CompanyId", "Id");
 
                     b.ToTable("Messages");
                 });
 
-            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.Family", b =>
+            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.Company", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -384,15 +367,12 @@ namespace NguyenDuongNhutKhang_app.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("PinHash")
-                        .HasColumnType("nvarchar(max)");
-
                     b.HasKey("Id");
 
-                    b.ToTable("Families");
+                    b.ToTable("Companies");
                 });
 
-            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.FamilyInvite", b =>
+            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.CompanyInvite", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -405,11 +385,11 @@ namespace NguyenDuongNhutKhang_app.Migrations
                         .HasMaxLength(6)
                         .HasColumnType("nvarchar(6)");
 
+                    b.Property<int>("CompanyId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<int>("FamilyId")
-                        .HasColumnType("int");
 
                     b.Property<DateTime?>("UsedAt")
                         .HasColumnType("datetime2");
@@ -418,7 +398,7 @@ namespace NguyenDuongNhutKhang_app.Migrations
 
                     b.HasIndex("Code");
 
-                    b.ToTable("FamilyInvites");
+                    b.ToTable("CompanyInvites");
                 });
 
             modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.LocationPoint", b =>
@@ -491,7 +471,7 @@ namespace NguyenDuongNhutKhang_app.Migrations
                     b.ToTable("OtpCodes");
                 });
 
-            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.SafeZone", b =>
+            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.Workplace", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -499,10 +479,16 @@ namespace NguyenDuongNhutKhang_app.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("CompanyId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("FamilyId")
+                    b.Property<int>("EndMinute")
+                        .HasColumnType("int");
+
+                    b.Property<int>("GraceMinutes")
                         .HasColumnType("int");
 
                     b.Property<double>("Latitude")
@@ -516,83 +502,22 @@ namespace NguyenDuongNhutKhang_app.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("nvarchar(120)");
 
-                    b.Property<bool>("NotifyEnter")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("NotifyExit")
-                        .HasColumnType("bit");
+                    b.Property<string>("QrSecret")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.Property<double>("RadiusMeters")
                         .HasColumnType("float");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("FamilyId");
-
-                    b.ToTable("SafeZones");
-                });
-
-            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.TranslationRecord", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
+                    b.Property<int>("StartMinute")
                         .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ChildId")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("FamilyId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SourceLang")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("SourceText")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
-                    b.Property<string>("TargetLang")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("TranslatedText")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("FamilyId", "CreatedAt");
+                    b.HasIndex("CompanyId");
 
-                    b.ToTable("Translations");
-                });
-
-            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.ZoneState", b =>
-                {
-                    b.Property<string>("UserId")
-                        .HasColumnType("nvarchar(450)");
-
-                    b.Property<int>("ZoneId")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("Inside")
-                        .HasColumnType("bit");
-
-                    b.HasKey("UserId", "ZoneId");
-
-                    b.ToTable("ZoneStates");
+                    b.ToTable("Workplaces");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>

@@ -47,8 +47,8 @@ public class EmailSender(IOptions<SmtpOptions> options, IOptions<BrevoOptions> b
     }
 
     public Task SendOtpAsync(string to, string code, string purpose) =>
-        SendAsync(to, $"KidGuard - Mã xác thực {code}",
-            "<div style=\"font-family:sans-serif\"><h2>KidGuard</h2>" +
+        SendAsync(to, $"ChamCong - Mã xác thực {code}",
+            "<div style=\"font-family:sans-serif\"><h2>ChamCong</h2>" +
             $"<p>Mã OTP {purpose} của bạn:</p>" +
             $"<p style=\"font-size:32px;letter-spacing:6px\"><b>{code}</b></p>" +
             "<p>Mã có hiệu lực 5 phút. Không chia sẻ mã này cho bất kỳ ai.</p></div>");

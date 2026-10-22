@@ -16,7 +16,7 @@ public class JwtService(IConfiguration config)
             new(ClaimTypes.NameIdentifier, user.Id),
             new(ClaimTypes.Name, user.UserName ?? ""),
             new(ClaimTypes.Role, role),
-            new("family_id", user.FamilyId?.ToString() ?? ""),
+            new("company_id", user.CompanyId?.ToString() ?? ""),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
         var expires = DateTime.UtcNow.AddHours(double.Parse(s["TokenExpiryTimeInHour"] ?? "8"));

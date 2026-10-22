@@ -19,10 +19,9 @@ public class AdminController(UserManager<AppUser> users, AppDbContext db) : ApiB
         return Ok(new
         {
             roles = roleCounts,
-            families = await db.Families.CountAsync(),
-            zones = await db.SafeZones.CountAsync(),
-            alerts24h = await db.Alerts.CountAsync(a => a.CreatedAt >= since),
-            sosOpen = await db.Alerts.CountAsync(a => a.Type == "SOS" && !a.IsResolved),
+            companies = await db.Companies.CountAsync(),
+            workplaces = await db.Workplaces.CountAsync(),
+            checkins24h = await db.Attendances.CountAsync(a => a.CheckIn >= since),
             locations24h = await db.Locations.CountAsync(l => l.CreatedAt >= since),
             messages24h = await db.Messages.CountAsync(m => m.CreatedAt >= since)
         });
@@ -40,7 +39,7 @@ public class AdminController(UserManager<AppUser> users, AppDbContext db) : ApiB
         var rows = await query.OrderByDescending(x => x.u.CreatedAt).Take(300).ToListAsync();
         return Ok(rows.Select(x => new
         {
-            x.u.Id, userName = x.u.UserName, x.u.FullName, x.u.Email, x.role, x.u.FamilyId, x.u.CreatedAt,
+            x.u.Id, userName = x.u.UserName, x.u.FullName, x.u.Email, x.role, x.u.CompanyId, x.u.CreatedAt,
             locked = x.u.LockoutEnd != null && x.u.LockoutEnd > DateTimeOffset.UtcNow
         }));
     }
@@ -64,9 +63,7 @@ public class AdminController(UserManager<AppUser> users, AppDbContext db) : ApiB
         if (id == UserId) return Fail(400, "Không thể xóa chính mình.");
         if ((await users.GetRolesAsync(u)).Contains(Roles.Admin)) return Fail(400, "Không xóa tài khoản quản trị.");
         db.Locations.RemoveRange(db.Locations.Where(l => l.UserId == id));
-        db.ZoneStates.RemoveRange(db.ZoneStates.Where(s => s.UserId == id));
-        db.Alerts.RemoveRange(db.Alerts.Where(a => a.ChildId == id));
-        db.Translations.RemoveRange(db.Translations.Where(t => t.ChildId == id));
+        db.Attendances.RemoveRange(db.Attendances.Where(a => a.UserId == id));
         db.Messages.RemoveRange(db.Messages.Where(m => m.SenderId == id));
         db.OtpCodes.RemoveRange(db.OtpCodes.Where(o => o.UserId == id));
         await db.SaveChangesAsync();
@@ -74,9 +71,9 @@ public class AdminController(UserManager<AppUser> users, AppDbContext db) : ApiB
         return NoContent();
     }
 
-    [HttpGet("alerts")]
-    public async Task<IActionResult> Alerts() =>
-        Ok(await (from a in db.Alerts join u in db.Users on a.ChildId equals u.Id orderby a.Id descending
-                  select new { a.Id, a.Type, a.Message, a.IsResolved, a.CreatedAt, a.FamilyId, childName = u.FullName })
+    [HttpGet("attendance")]
+    public async Task<IActionResult> Attendance() =>
+        Ok(await (from a in db.Attendances join u in db.Users on a.UserId equals u.Id orderby a.Id descending
+                  select new { a.Id, a.Status, a.CheckIn, a.CheckOut, a.CompanyId, employeeName = u.FullName })
             .Take(100).ToListAsync());
 }
