@@ -22,7 +22,8 @@ public record RegisterDto(
 public record LoginDto([Required] string Username, [Required] string Password, string? Channel = null);
 public record OtpDto([Required] string Username, [Required, StringLength(6, MinimumLength = 6)] string Code);
 public record UsernameDto([Required] string Username, string? Channel = null);
-public record GoogleDto([Required] string IdToken);
+public record GoogleDto([Required] string IdToken, string? Role = null, string? InviteCode = null);
+public record UpdateProfileDto([StringLength(100)] string? FullName = null, [EmailAddress] string? Email = null, [StringLength(20)] string? Phone = null);
 
 [Route("api/[controller]")]
 public class AuthController(
@@ -167,6 +168,16 @@ public class AuthController(
                    ?? await users.FindByEmailAsync(payload.Email);
         if (user == null)
         {
+            // Gmail chưa có trong hệ thống: app hỏi người dùng là quản lý hay nhân viên (nhân viên nhập mã mời của quản lý).
+            if (string.IsNullOrEmpty(dto.Role))
+                return Ok(new { status = true, needsRole = true, email = payload.Email, name = payload.Name });
+            CompanyInvite? invite = null;
+            if (dto.Role == "employee")
+            {
+                invite = string.IsNullOrEmpty(dto.InviteCode) ? null
+                    : await db.CompanyInvites.FirstOrDefaultAsync(i => i.Code == dto.InviteCode && i.UsedAt == null && i.ExpiresAt > DateTime.UtcNow);
+                if (invite == null) return Fail(400, "Mã mời không đúng hoặc đã hết hạn. Hãy nhờ quản lý tạo mã mới.");
+            }
             var baseName = new string(payload.Email.Split('@')[0].Where(char.IsLetterOrDigit).ToArray());
             var name = baseName;
             for (var i = 1; await users.FindByNameAsync(name) != null; i++) name = baseName + i;
@@ -177,6 +188,15 @@ public class AuthController(
             };
             var created = await users.CreateAsync(user);
             if (!created.Succeeded) return Fail(400, string.Join(" ", created.Errors.Select(e => e.Description)));
+            if (invite != null)
+            {
+                user.CompanyId = invite.CompanyId;
+                await users.UpdateAsync(user);
+                await users.AddToRoleAsync(user, Roles.Employee);
+                invite.UsedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+                return Ok(await Session(user));
+            }
             var company = new Company { Name = $"Công ty của {user.FullName}", OwnerId = user.Id };
             db.Companies.Add(company);
             await db.SaveChangesAsync();
@@ -197,6 +217,37 @@ public class AuthController(
     {
         var user = await users.FindByIdAsync(UserId);
         if (user == null) return Unauthorized();
+        return Ok(await Profile(user));
+    }
+
+    // PUT api/Auth/me : tự chỉnh họ tên, email, số điện thoại nhận OTP (mặc định nhân viên dùng email/SĐT của quản lý)
+    [Authorize, HttpPut("me")]
+    public async Task<IActionResult> UpdateMe(UpdateProfileDto dto)
+    {
+        var user = await users.FindByIdAsync(UserId);
+        if (user == null) return Unauthorized();
+        var role = (await users.GetRolesAsync(user)).FirstOrDefault() ?? "";
+        if (!string.IsNullOrWhiteSpace(dto.FullName)) user.FullName = dto.FullName.Trim();
+
+        var phone = SmsSender.Normalize(dto.Phone);
+        if (!string.IsNullOrWhiteSpace(dto.Phone) && phone == null) return Fail(400, "Số điện thoại không hợp lệ.");
+        user.PhoneNumber = phone;
+
+        var newEmail = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
+        if (!string.Equals(newEmail, user.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            // Quản lý bắt buộc có email đã xác minh; nhân viên được để trống (dùng email quản lý).
+            if (newEmail == null && role != Roles.Employee) return Fail(400, "Quản lý phải có email.");
+            if (newEmail != null)
+            {
+                var other = await users.FindByEmailAsync(newEmail);
+                if (other != null && other.Id != user.Id) return Fail(400, "Email đã được dùng bởi tài khoản khác.");
+            }
+            user.Email = newEmail;
+            user.EmailConfirmed = role == Roles.Employee || newEmail == null ? user.EmailConfirmed : user.GoogleSubject != null;
+        }
+        var res = await users.UpdateAsync(user);
+        if (!res.Succeeded) return Fail(400, string.Join(" ", res.Errors.Select(e => e.Description)));
         return Ok(await Profile(user));
     }
 
