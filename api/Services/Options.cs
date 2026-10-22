@@ -41,6 +41,12 @@ public class AdminSeedOptions
 
 /// <summary>Gửi SMS OTP qua SpeedSMS (nhà cung cấp Việt Nam). Có AccessToken thì ưu tiên dùng thay Twilio.
 /// Type: 2 = đầu số ngẫu nhiên, 3 = brandname, 4 = brandname mặc định, 5 = ứng dụng Android (dùng SIM điện thoại của bạn).</summary>
+/// <summary>Chế độ demo: không gửi SMS/email thật, trả mã OTP trong header X-Demo-Otp để app hiển thị. Chỉ bật khi báo cáo.</summary>
+public class DemoOptions
+{
+    public bool ShowOtp { get; set; }
+}
+
 public class SpeedSmsOptions
 {
     public string AccessToken { get; set; } = "";

@@ -29,7 +29,7 @@ public record UpdateProfileDto([StringLength(100)] string? FullName = null, [Ema
 [Route("api/[controller]")]
 public class AuthController(
     UserManager<AppUser> users, AppDbContext db, OtpService otp, EmailSender email, SmsSender sms, JwtService jwt,
-    IOptions<GoogleOptions> google, ILogger<AuthController> log) : ApiBase
+    IOptions<GoogleOptions> google, IOptions<DemoOptions> demo, ILogger<AuthController> log) : ApiBase
 {
     // POST api/Auth/register : đăng ký quản lý qua email, gửi OTP xác minh email
     [HttpPost("register")]
@@ -358,6 +358,12 @@ public class AuthController(
     {
         var code = await otp.IssueAsync(user.Id, purpose);
         if (code == null) return Fail(429, "Vui lòng đợi 30 giây trước khi yêu cầu mã mới.");
+        if (demo.Value.ShowOtp)
+        {
+            Response.Headers["X-Demo-Otp"] = code;
+            log.LogWarning("DEMO: OTP {Purpose} cho {To} = {Code}", purpose, to, code);
+            return null;
+        }
         try
         {
             if (viaSms) await sms.SendOtpAsync(to, code);
