@@ -17,7 +17,8 @@ public record RegisterDto(
     [Required, StringLength(120)] string FullName,
     [RegularExpression("^(manager|employee)$")] string? Role = null,
     [StringLength(6, MinimumLength = 6)] string? InviteCode = null,
-    [StringLength(20)] string? Phone = null);
+    [StringLength(20)] string? Phone = null,
+    string? Channel = null);
 
 public record LoginDto([Required] string Username, [Required] string Password, string? Channel = null);
 public record OtpDto([Required] string Username, [Required, StringLength(6, MinimumLength = 6)] string Code);
@@ -39,6 +40,8 @@ public class AuthController(
         if (!string.IsNullOrWhiteSpace(dto.Phone) && phone == null) return Fail(400, "Số điện thoại không hợp lệ.");
         if (dto.Role == "employee") return await RegisterEmployee(dto, phone);
         if (string.IsNullOrWhiteSpace(dto.Email)) return Fail(400, "Vui lòng nhập email.");
+        var viaSms = string.Equals(dto.Channel, "sms", StringComparison.OrdinalIgnoreCase);
+        if (viaSms && phone == null) return Fail(400, "Cần nhập số điện thoại để nhận SMS OTP.");
         if (await users.FindByEmailAsync(dto.Email) != null) return Fail(400, "Email đã được đăng ký.");
 
         var user = new AppUser { UserName = dto.Username, Email = dto.Email, FullName = dto.FullName.Trim(), PhoneNumber = phone };
@@ -53,9 +56,21 @@ public class AuthController(
         await users.UpdateAsync(user);
         await users.AddToRoleAsync(user, Roles.Manager);
 
-        var sent = await SendOtp(user, "verify-email", user.Email!, "xác minh email");
-        if (sent is not null) return sent;
-        return Ok(new { status = true, message = "Đã gửi mã xác minh tới email.", requiresEmailVerification = true });
+        // Người đăng ký chọn nhận mã xác minh qua email hay SMS; gửi lỗi thì xóa tài khoản vừa tạo để đăng ký lại được.
+        var target = viaSms ? phone! : user.Email!;
+        var sent = await SendOtp(user, "verify-email", target, "xác minh tài khoản", viaSms);
+        if (sent is not null)
+        {
+            await users.DeleteAsync(user);
+            db.Companies.Remove(company);
+            await db.SaveChangesAsync();
+            return sent;
+        }
+        return Ok(new
+        {
+            status = true, message = viaSms ? "Đã gửi mã xác minh qua SMS." : "Đã gửi mã xác minh tới email.", requiresEmailVerification = true,
+            channel = viaSms ? "sms" : "email", maskedTarget = viaSms ? SmsSender.Mask(target) : Mask(target)
+        });
     }
 
     // Nhân viên tự đăng ký bằng mã mời 6 số của quản lý; OTP đăng nhập gửi về email nhân viên (nếu có) hoặc email quản lý.
@@ -91,7 +106,10 @@ public class AuthController(
     {
         var user = await FindUser(dto.Username);
         if (user == null || user.EmailConfirmed || user.Email == null) return Ok(new { status = true });
-        return await SendOtp(user, "verify-email", user.Email, "xác minh email")
+        var viaSms = string.Equals(dto.Channel, "sms", StringComparison.OrdinalIgnoreCase);
+        var phone = SmsSender.Normalize(user.PhoneNumber);
+        if (viaSms && phone == null) return Ok(new { status = true });
+        return await SendOtp(user, "verify-email", viaSms ? phone! : user.Email, "xác minh tài khoản", viaSms)
                ?? Ok(new { status = true, message = "Đã gửi lại mã." });
     }
 
