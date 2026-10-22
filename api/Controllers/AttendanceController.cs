@@ -52,6 +52,16 @@ public class AttendanceController(AppDbContext db, QrService qr) : ApiBase
         if (open == null)
         {
             var mod = MinuteOfDay(now);
+            // Chỉ cho vào ca trong khung giờ làm việc: sớm nhất 2 giờ trước giờ vào ca, đến hết giờ tan ca.
+            if (z.EndMinute > z.StartMinute)
+            {
+                static string Hm(int m) => $"{m / 60:00}:{m % 60:00}";
+                var earliest = Math.Max(0, z.StartMinute - 120);
+                if (mod < earliest)
+                    return Fail(400, $"Chưa đến giờ chấm công. Ca làm {Hm(z.StartMinute)}–{Hm(z.EndMinute)}, chấm công sớm nhất từ {Hm(earliest)}.");
+                if (mod >= z.EndMinute)
+                    return Fail(400, $"Đã hết giờ làm ({Hm(z.StartMinute)}–{Hm(z.EndMinute)}), không thể vào ca lúc này.");
+            }
             var late = Math.Max(0, mod - z.StartMinute);
             var isLate = late > z.GraceMinutes;
             var a = new Attendance
