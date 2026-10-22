@@ -80,14 +80,26 @@ public class AuthController(
             : await db.CompanyInvites.FirstOrDefaultAsync(i => i.Code == dto.InviteCode && i.UsedAt == null && i.ExpiresAt > DateTime.UtcNow);
         if (invite == null) return Fail(400, "Mã mời không đúng hoặc đã hết hạn. Hãy nhờ quản lý tạo mã mới.");
 
-        var emp = new AppUser { UserName = dto.Username, FullName = dto.FullName.Trim(), EmailConfirmed = true, CompanyId = invite.CompanyId, PhoneNumber = phone };
+        if (string.IsNullOrWhiteSpace(dto.Email)) return Fail(400, "Vui lòng nhập Gmail/email để nhận mã xác minh.");
+        if (await users.FindByEmailAsync(dto.Email) != null) return Fail(400, "Email đã được đăng ký.");
+
+        var emp = new AppUser { UserName = dto.Username, Email = dto.Email, FullName = dto.FullName.Trim(), CompanyId = invite.CompanyId, PhoneNumber = phone };
         var created = await users.CreateAsync(emp, dto.Password);
         if (!created.Succeeded)
             return BadRequest(new { status = false, message = string.Join(" ", created.Errors.Select(e => e.Description)) });
         await users.AddToRoleAsync(emp, Roles.Employee);
         invite.UsedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
-        return Ok(await Session(emp));
+        // Nhân viên cũng phải xác minh email bằng OTP; gửi lỗi thì hoàn tác để đăng ký lại được.
+        var sent = await SendOtp(emp, "verify-email", emp.Email!, "xác minh tài khoản");
+        if (sent is not null)
+        {
+            await users.DeleteAsync(emp);
+            invite.UsedAt = null;
+            await db.SaveChangesAsync();
+            return sent;
+        }
+        return Ok(new { status = true, message = "Đã gửi mã xác minh tới email.", requiresEmailVerification = true, channel = "email", maskedTarget = Mask(emp.Email!) });
     }
 
     [HttpPost("verify-email")]
@@ -128,7 +140,7 @@ public class AuthController(
         await users.ResetAccessFailedCountAsync(user);
 
         var role = (await users.GetRolesAsync(user)).FirstOrDefault() ?? "";
-        if (role != Roles.Employee && !user.EmailConfirmed)
+        if (!user.EmailConfirmed && user.Email != null)
         {
             await SendOtp(user, "verify-email", user.Email!, "xác minh email");
             return StatusCode(403, new { status = false, message = "Email chưa được xác minh. Đã gửi mã mới.", needsEmailVerification = true, username = user.UserName });
