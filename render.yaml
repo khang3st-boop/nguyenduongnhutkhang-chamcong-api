@@ -31,8 +31,6 @@ services:
         sync: false
       - key: Agora__AppCertificate
         sync: false
-      - key: Gemini__ApiKey
-        sync: false
       - key: Admin__Email
         sync: false
       - key: Admin__Password
