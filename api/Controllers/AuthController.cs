@@ -251,13 +251,9 @@ public class AuthController(
         if (err != null) return err;
         if (!ContactChanged(user, phone, newEmail)) return Ok(new { status = true, needsOtp = false });
 
-        string? target; bool isSms;
-        if (phone != null && phone != SmsSender.Normalize(user.PhoneNumber)) (target, isSms) = (phone, true);
-        else
-        {
-            (target, isSms) = await ResolveTarget(user, role, "sms");
-            if (target == null) (target, isSms) = (await OtpTarget(user, role), false);
-        }
+        // Đổi email: mã OTP gửi về email hiện tại của tài khoản (không dùng SMS).
+        var target = await OtpTarget(user, role);
+        const bool isSms = false;
         if (target == null) return Fail(400, "Không có số điện thoại hay email nào để gửi mã xác nhận.");
         var sent = await SendOtp(user, ChangePurpose(phone, newEmail), target, "đổi thông tin tài khoản", isSms);
         if (sent is not null) return sent;
