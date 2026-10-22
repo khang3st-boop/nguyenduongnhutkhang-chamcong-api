@@ -71,14 +71,23 @@ public class AssistantController(AppDbContext db, IConfiguration cfg, ILogger<As
                     ["contents"] = JsonNode.Parse(contents.ToJsonString()),
                     ["tools"] = new JsonArray(new JsonObject { ["functionDeclarations"] = Declarations() }),
                 };
-                using var req = new HttpRequestMessage(HttpMethod.Post,
-                    $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent")
+                HttpResponseMessage res;
+                string raw;
+                for (var attempt = 0; ; attempt++)
                 {
-                    Content = new StringContent(body.ToJsonString(), System.Text.Encoding.UTF8, "application/json"),
-                };
-                req.Headers.Add("x-goog-api-key", key);
-                using var res = await Http.SendAsync(req, ct);
-                var raw = await res.Content.ReadAsStringAsync(ct);
+                    using var req = new HttpRequestMessage(HttpMethod.Post,
+                        $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent")
+                    {
+                        Content = new StringContent(body.ToJsonString(), System.Text.Encoding.UTF8, "application/json"),
+                    };
+                    req.Headers.Add("x-goog-api-key", key);
+                    res = await Http.SendAsync(req, ct);
+                    raw = await res.Content.ReadAsStringAsync(ct);
+                    if ((int)res.StatusCode != 503 || attempt >= 3) break;
+                    res.Dispose();
+                    await Task.Delay(1500 * (attempt + 1), ct);
+                }
+                using var _ = res;
                 if (!res.IsSuccessStatusCode)
                 {
                     log.LogWarning("Gemini {Status}: {Body}", (int)res.StatusCode, raw.Length > 400 ? raw[..400] : raw);
