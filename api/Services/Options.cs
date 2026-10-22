@@ -38,3 +38,13 @@ public class AdminSeedOptions
     public string Password { get; set; } = "";
     public string UserName { get; set; } = "admin";
 }
+
+/// <summary>Gửi SMS OTP qua Twilio. BaseUrl chỉ đổi khi kiểm thử với máy chủ giả.</summary>
+public class TwilioOptions
+{
+    public string AccountSid { get; set; } = "";
+    public string AuthToken { get; set; } = "";
+    public string From { get; set; } = ""; // số Twilio (+1...) hoặc Messaging Service SID (MG...)
+    public string BaseUrl { get; set; } = "https://api.twilio.com";
+    public bool Configured => !string.IsNullOrWhiteSpace(AccountSid) && !string.IsNullOrWhiteSpace(AuthToken) && !string.IsNullOrWhiteSpace(From);
+}

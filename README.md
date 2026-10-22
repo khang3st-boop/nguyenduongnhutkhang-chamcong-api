@@ -13,7 +13,7 @@ REST API (ASP.NET Core .NET 10, EF Core, Identity, JWT) cho ứng dụng chấm 
 
 ## Cấu hình (biến môi trường)
 `ConnectionStrings__DefaultConnection`, `Database__Provider` (Postgres|SqlServer), `JWTKey__Secret`, `Admin__Email`, `Admin__Password`,
-`Brevo__ApiKey`, `Google__ClientIds__0`, `Agora__AppId`, `Agora__AppCertificate`, `PORT`.
+`Brevo__ApiKey`, `Brevo__SenderEmail`, `Twilio__AccountSid`, `Twilio__AuthToken`, `Twilio__From` (SMS OTP), `Google__ClientIds__0`, `Agora__AppId`, `Agora__AppCertificate`, `PORT`.
 
 Lưu ý: cơ sở dữ liệu phải **trống** (Postgres tự tạo bảng khi khởi động).
 

@@ -16,16 +16,17 @@ public record RegisterDto(
     [Required, MinLength(6)] string Password,
     [Required, StringLength(120)] string FullName,
     [RegularExpression("^(manager|employee)$")] string? Role = null,
-    [StringLength(6, MinimumLength = 6)] string? InviteCode = null);
+    [StringLength(6, MinimumLength = 6)] string? InviteCode = null,
+    [StringLength(20)] string? Phone = null);
 
-public record LoginDto([Required] string Username, [Required] string Password);
+public record LoginDto([Required] string Username, [Required] string Password, string? Channel = null);
 public record OtpDto([Required] string Username, [Required, StringLength(6, MinimumLength = 6)] string Code);
-public record UsernameDto([Required] string Username);
+public record UsernameDto([Required] string Username, string? Channel = null);
 public record GoogleDto([Required] string IdToken);
 
 [Route("api/[controller]")]
 public class AuthController(
-    UserManager<AppUser> users, AppDbContext db, OtpService otp, EmailSender email, JwtService jwt,
+    UserManager<AppUser> users, AppDbContext db, OtpService otp, EmailSender email, SmsSender sms, JwtService jwt,
     IOptions<GoogleOptions> google, ILogger<AuthController> log) : ApiBase
 {
     // POST api/Auth/register : đăng ký quản lý qua email, gửi OTP xác minh email
@@ -33,11 +34,13 @@ public class AuthController(
     public async Task<IActionResult> Register(RegisterDto dto)
     {
         if (await users.FindByNameAsync(dto.Username) != null) return Fail(400, "Tên đăng nhập đã tồn tại.");
-        if (dto.Role == "employee") return await RegisterEmployee(dto);
+        var phone = SmsSender.Normalize(dto.Phone);
+        if (!string.IsNullOrWhiteSpace(dto.Phone) && phone == null) return Fail(400, "Số điện thoại không hợp lệ.");
+        if (dto.Role == "employee") return await RegisterEmployee(dto, phone);
         if (string.IsNullOrWhiteSpace(dto.Email)) return Fail(400, "Vui lòng nhập email.");
         if (await users.FindByEmailAsync(dto.Email) != null) return Fail(400, "Email đã được đăng ký.");
 
-        var user = new AppUser { UserName = dto.Username, Email = dto.Email, FullName = dto.FullName.Trim() };
+        var user = new AppUser { UserName = dto.Username, Email = dto.Email, FullName = dto.FullName.Trim(), PhoneNumber = phone };
         var created = await users.CreateAsync(user, dto.Password);
         if (!created.Succeeded)
             return BadRequest(new { status = false, message = string.Join(" ", created.Errors.Select(e => e.Description)) });
@@ -55,13 +58,13 @@ public class AuthController(
     }
 
     // Nhân viên tự đăng ký bằng mã mời 6 số của quản lý; OTP đăng nhập gửi về email nhân viên (nếu có) hoặc email quản lý.
-    private async Task<IActionResult> RegisterEmployee(RegisterDto dto)
+    private async Task<IActionResult> RegisterEmployee(RegisterDto dto, string? phone)
     {
         var invite = string.IsNullOrEmpty(dto.InviteCode) ? null
             : await db.CompanyInvites.FirstOrDefaultAsync(i => i.Code == dto.InviteCode && i.UsedAt == null && i.ExpiresAt > DateTime.UtcNow);
         if (invite == null) return Fail(400, "Mã mời không đúng hoặc đã hết hạn. Hãy nhờ quản lý tạo mã mới.");
 
-        var emp = new AppUser { UserName = dto.Username, FullName = dto.FullName.Trim(), EmailConfirmed = true, CompanyId = invite.CompanyId };
+        var emp = new AppUser { UserName = dto.Username, FullName = dto.FullName.Trim(), EmailConfirmed = true, CompanyId = invite.CompanyId, PhoneNumber = phone };
         var created = await users.CreateAsync(emp, dto.Password);
         if (!created.Succeeded)
             return BadRequest(new { status = false, message = string.Join(" ", created.Errors.Select(e => e.Description)) });
@@ -112,11 +115,13 @@ public class AuthController(
             return StatusCode(403, new { status = false, message = "Email chưa được xác minh. Đã gửi mã mới.", needsEmailVerification = true, username = user.UserName });
         }
 
-        var target = await OtpTarget(user, role);
-        if (target == null) return Fail(400, "Tài khoản chưa có email nhận OTP.");
-        var err = await SendOtp(user, "login", target, "đăng nhập");
+        var (target, isSms) = await ResolveTarget(user, role, dto.Channel);
+        if (target == null)
+            return Fail(400, isSms ? "Tài khoản chưa có số điện thoại nhận OTP." : "Tài khoản chưa có email nhận OTP.");
+        var err = await SendOtp(user, "login", target, "đăng nhập", isSms);
         if (err is not null) return err;
-        return Ok(new { status = true, requiresOtp = true, username = user.UserName, maskedEmail = Mask(target) });
+        var masked = isSms ? SmsSender.Mask(target) : Mask(target);
+        return Ok(new { status = true, requiresOtp = true, username = user.UserName, channel = isSms ? "sms" : "email", maskedTarget = masked, maskedEmail = masked });
     }
 
     [HttpPost("resend-login-otp")]
@@ -125,9 +130,9 @@ public class AuthController(
         var user = await FindUser(dto.Username);
         if (user == null) return Ok(new { status = true });
         var role = (await users.GetRolesAsync(user)).FirstOrDefault() ?? "";
-        var target = await OtpTarget(user, role);
+        var (target, isSms) = await ResolveTarget(user, role, dto.Channel);
         if (target == null) return Ok(new { status = true });
-        return await SendOtp(user, "login", target, "đăng nhập") ?? Ok(new { status = true, message = "Đã gửi lại mã." });
+        return await SendOtp(user, "login", target, "đăng nhập", isSms) ?? Ok(new { status = true, message = "Đã gửi lại mã." });
     }
 
     // POST api/Auth/verify-otp : bước 2 - nhập OTP nhận JWT
@@ -209,7 +214,7 @@ public class AuthController(
     private async Task<object> Profile(AppUser user) => new
     {
         id = user.Id, userName = user.UserName, fullName = user.FullName, email = user.Email,
-        avatarUrl = user.AvatarUrl, companyId = user.CompanyId,
+        phone = user.PhoneNumber, avatarUrl = user.AvatarUrl, companyId = user.CompanyId,
         role = (await users.GetRolesAsync(user)).FirstOrDefault()
     };
 
@@ -222,14 +227,32 @@ public class AuthController(
         return ownerId == null ? null : (await users.FindByIdAsync(ownerId))?.Email;
     }
 
-    private async Task<IActionResult?> SendOtp(AppUser user, string purpose, string to, string label)
+    // Kênh OTP: "sms" gửi tới số điện thoại của người dùng (nhân viên chưa có số thì dùng số của quản lý); còn lại gửi email.
+    private async Task<(string? target, bool isSms)> ResolveTarget(AppUser user, string role, string? channel)
+    {
+        if (!string.Equals(channel, "sms", StringComparison.OrdinalIgnoreCase)) return (await OtpTarget(user, role), false);
+        var phone = SmsSender.Normalize(user.PhoneNumber);
+        if (phone == null && role == Roles.Employee && user.CompanyId != null)
+        {
+            var ownerId = await db.Companies.Where(f => f.Id == user.CompanyId).Select(f => f.OwnerId).FirstOrDefaultAsync();
+            if (ownerId != null) phone = SmsSender.Normalize((await users.FindByIdAsync(ownerId))?.PhoneNumber);
+        }
+        return (phone, true);
+    }
+
+    private async Task<IActionResult?> SendOtp(AppUser user, string purpose, string to, string label, bool viaSms = false)
     {
         var code = await otp.IssueAsync(user.Id, purpose);
         if (code == null) return Fail(429, "Vui lòng đợi 30 giây trước khi yêu cầu mã mới.");
         try
         {
-            await email.SendOtpAsync(to, code, label);
+            if (viaSms) await sms.SendOtpAsync(to, code);
+            else await email.SendOtpAsync(to, code, label);
             return null;
+        }
+        catch (SmsNotConfiguredException)
+        {
+            return Fail(503, "Máy chủ chưa cấu hình SMS (Twilio).");
         }
         catch (EmailNotConfiguredException)
         {
@@ -237,8 +260,8 @@ public class AuthController(
         }
         catch (Exception ex)
         {
-            log.LogError("Gửi email OTP thất bại: {Type}: {Message}", ex.GetType().Name, ex.Message);
-            return Fail(502, "Không gửi được email OTP. Kiểm tra cấu hình SMTP.");
+            log.LogError("Gửi OTP ({Kind}) thất bại: {Type}: {Message}", viaSms ? "sms" : "email", ex.GetType().Name, ex.Message);
+            return Fail(502, viaSms ? "Không gửi được SMS OTP. Kiểm tra cấu hình Twilio và số điện thoại đã xác minh." : "Không gửi được email OTP. Kiểm tra cấu hình SMTP.");
         }
     }
 

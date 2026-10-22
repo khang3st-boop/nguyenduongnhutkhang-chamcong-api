@@ -15,6 +15,39 @@ BASE = (sys.argv[1] if len(sys.argv) > 1 else "http://localhost:5300").rstrip("/
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@test.local")
 ADMIN_PASS = os.environ.get("ADMIN_PASS", "Admin@12345")
 results = []
+SMS = []  # (số nhận, nội dung) do máy chủ Twilio giả nhận được
+
+
+def start_fake_twilio(port=2526):
+    import threading
+    import urllib.parse
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class H(BaseHTTPRequestHandler):
+        def do_POST(self):
+            q = urllib.parse.parse_qs(self.rfile.read(int(self.headers.get("Content-Length", 0))).decode())
+            SMS.append((q.get("To", [""])[0], q.get("Body", [""])[0]))
+            self.send_response(201)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"sid":"SMtest"}')
+
+        def log_message(self, *a):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", port), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+
+def sms_otp(to, since):
+    for _ in range(40):
+        for t, body in SMS[since:]:
+            if t == to:
+                m = re.search(r"(\d{6})", body)
+                if m:
+                    return m.group(1)
+        time.sleep(0.25)
+    raise RuntimeError(f"không nhận được SMS OTP cho {to}; SMS={SMS}")
 
 
 def call(method, path, body=None, token=None):
@@ -63,6 +96,7 @@ def login_flow(user, pw, email):
 
 def main():
     smtp_sink.start(2525)
+    start_fake_twilio(2526)
     t = str(int(time.time()))[-6:]
     mgr, memail = f"mgr{t}", f"mgr{t}@example.com"
     emp, emp2 = f"emp{t}", f"emq{t}"
@@ -76,8 +110,8 @@ def main():
     s, b = call("POST", "/api/Auth/register", {"username": "ab", "password": "x", "fullName": "", "email": "bad"})
     check("register dữ liệu sai → 400", s, 400)
     n = len(smtp_sink.MAILS)
-    s, b = call("POST", "/api/Auth/register", {"username": mgr, "password": "Pass@123", "fullName": "Quản Lý Test", "email": memail, "role": "manager"})
-    check("register manager", s, 200, b)
+    s, b = call("POST", "/api/Auth/register", {"username": mgr, "password": "Pass@123", "fullName": "Quản Lý Test", "email": memail, "role": "manager", "phone": "0912345678"})
+    check("register manager (có SĐT)", s, 200, b)
     s, b = call("POST", "/api/Auth/register", {"username": mgr, "password": "Pass@123", "fullName": "Trùng", "email": "other@example.com", "role": "manager"})
     check("register trùng username → 400", s, 400)
     s, b = call("POST", "/api/Auth/login", {"username": mgr, "password": "Pass@123"})
@@ -97,9 +131,12 @@ def main():
     check("GET me (manager)", s, 200, b)
     check("me.role = Manager", b.get("role") if isinstance(b, dict) else None, "Manager")
     s, b = call("POST", "/api/Auth/google", {"idToken": "khong-hop-le"})
-    check("google idToken sai → 4xx", s, [400, 401], b)
+    check("google idToken sai → 4xx (503 nếu chưa cấu hình)", s, [400, 401, 503], b)
     s, b = call("POST", "/api/Auth/resend-email-code", {"username": mgr})
     check("resend-email-code", s, 200)
+
+    s, b = call("POST", "/api/Auth/register", {"username": mgr + "p", "password": "Pass@123", "fullName": "Sai SĐT", "email": "p" + memail, "role": "manager", "phone": "abc"})
+    check("register SĐT sai → 400", s, 400)
 
     # ---- Company ----
     s, b = call("GET", "/api/Company", token=mt)
@@ -151,6 +188,25 @@ def main():
     et = login_flow(emp, "Pass@123", memail)
     s, b = call("GET", "/api/Auth/me", token=et)
     check("me.role = Employee", b.get("role") if isinstance(b, dict) else None, "Employee")
+
+    # ---- Đăng nhập bằng SMS OTP ----
+    time.sleep(31)
+    n = len(SMS)
+    s, b = call("POST", "/api/Auth/login", {"username": mgr, "password": "Pass@123", "channel": "sms"})
+    check("login SMS (quản lý)", s, 200, b)
+    check("channel = sms", b.get("channel") if isinstance(b, dict) else None, "sms")
+    code = sms_otp("+84912345678", n)
+    s, b = call("POST", "/api/Auth/verify-otp", {"username": mgr, "code": code})
+    check("verify SMS OTP", s, 200, b)
+    time.sleep(31)
+    n = len(SMS)
+    s, b = call("POST", "/api/Auth/login", {"username": emp, "password": "Pass@123", "channel": "sms"})
+    check("login SMS (nhân viên dùng SĐT quản lý)", s, 200, b)
+    code = sms_otp("+84912345678", n)
+    s, b = call("POST", "/api/Auth/verify-otp", {"username": emp, "code": code})
+    check("verify SMS OTP nhân viên", s, 200, b)
+    s, b = call("GET", "/api/Auth/me", token=mt)
+    check("me.phone = +84912345678", b.get("phone") if isinstance(b, dict) else None, "+84912345678")
 
     # ---- Phân quyền ----
     s, _ = call("GET", "/api/Employees", token=et)
@@ -251,6 +307,8 @@ def main():
     s, b = call("POST", "/api/Auth/login", {"username": ADMIN_EMAIL, "password": ADMIN_PASS})
     if s == 200:
         at = None
+        s2, b2 = call("POST", "/api/Auth/login", {"username": ADMIN_EMAIL, "password": ADMIN_PASS, "channel": "sms"})
+        check("admin chưa có SĐT, login SMS → 400", s2, 400, b2)
         try:
             code = otp_for(ADMIN_EMAIL, n)
             s, b = call("POST", "/api/Auth/verify-otp", {"username": ADMIN_EMAIL, "code": code})

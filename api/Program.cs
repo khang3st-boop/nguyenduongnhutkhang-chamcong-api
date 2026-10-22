@@ -43,10 +43,12 @@ builder.Services.AddIdentity<AppUser, IdentityRole>(o =>
 
 builder.Services.Configure<SmtpOptions>(cfg.GetSection("Smtp"));
 builder.Services.Configure<BrevoOptions>(cfg.GetSection("Brevo"));
+builder.Services.Configure<TwilioOptions>(cfg.GetSection("Twilio"));
 builder.Services.Configure<GoogleOptions>(cfg.GetSection("Google"));
 builder.Services.Configure<AgoraOptions>(cfg.GetSection("Agora"));
 builder.Services.Configure<AdminSeedOptions>(cfg.GetSection("Admin"));
 builder.Services.AddScoped<EmailSender>();
+builder.Services.AddScoped<SmsSender>();
 builder.Services.AddScoped<OtpService>();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddSingleton<QrService>();

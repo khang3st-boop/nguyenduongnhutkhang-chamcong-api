@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NguyenDuongNhutKhang_app.Data;
+using NguyenDuongNhutKhang_app.Services;
 
 namespace NguyenDuongNhutKhang_app.Controllers;
 
@@ -13,14 +14,16 @@ public record EmployeeCreateDto(
     [Required, StringLength(120)] string FullName,
     [EmailAddress] string? Email,
     [StringLength(80)] string? Position = null,
-    [StringLength(80)] string? Department = null);
+    [StringLength(80)] string? Department = null,
+    [StringLength(20)] string? Phone = null);
 
 public record EmployeeUpdateDto(
     [Required, StringLength(120)] string FullName,
     [MinLength(6)] string? Password,
     [EmailAddress] string? Email,
     [StringLength(80)] string? Position = null,
-    [StringLength(80)] string? Department = null);
+    [StringLength(80)] string? Department = null,
+    [StringLength(20)] string? Phone = null);
 
 /// <summary>CRUD nhân viên của công ty (chỉ quản lý).</summary>
 [Authorize(Roles = Roles.Manager), Route("api/[controller]")]
@@ -41,7 +44,7 @@ public class EmployeesController(UserManager<AppUser> users, AppDbContext db) : 
             var l = last.FirstOrDefault(x => x.UserId == k.Id);
             return new
             {
-                k.Id, userName = k.UserName, k.FullName, k.Email, k.Position, k.Department, k.CreatedAt,
+                k.Id, userName = k.UserName, k.FullName, k.Email, phone = k.PhoneNumber, k.Position, k.Department, k.CreatedAt,
                 working = open.Contains(k.Id),
                 lastLocation = l == null ? null : new { l.Latitude, l.Longitude, l.Accuracy, l.Battery, l.CreatedAt }
             };
@@ -52,15 +55,18 @@ public class EmployeesController(UserManager<AppUser> users, AppDbContext db) : 
     public async Task<IActionResult> Get(string id)
     {
         var k = await Employees().FirstOrDefaultAsync(x => x.Id == id);
-        return k == null ? NotFound() : Ok(new { k.Id, userName = k.UserName, k.FullName, k.Email, k.Position, k.Department, k.CreatedAt });
+        return k == null ? NotFound() : Ok(new { k.Id, userName = k.UserName, k.FullName, k.Email, phone = k.PhoneNumber, k.Position, k.Department, k.CreatedAt });
     }
 
     [HttpPost]
     public async Task<IActionResult> Create(EmployeeCreateDto dto)
     {
         if (await users.FindByNameAsync(dto.Username) != null) return Fail(400, "Tên đăng nhập đã tồn tại.");
+        var phone = SmsSender.Normalize(dto.Phone);
+        if (!string.IsNullOrWhiteSpace(dto.Phone) && phone == null) return Fail(400, "Số điện thoại không hợp lệ.");
         var emp = new AppUser
         {
+            PhoneNumber = phone,
             UserName = dto.Username, FullName = dto.FullName.Trim(), Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email,
             EmailConfirmed = true, CompanyId = CompanyId, Position = dto.Position, Department = dto.Department
         };
@@ -75,6 +81,9 @@ public class EmployeesController(UserManager<AppUser> users, AppDbContext db) : 
     {
         var emp = await Employees().FirstOrDefaultAsync(x => x.Id == id);
         if (emp == null) return NotFound();
+        var phone = SmsSender.Normalize(dto.Phone);
+        if (!string.IsNullOrWhiteSpace(dto.Phone) && phone == null) return Fail(400, "Số điện thoại không hợp lệ.");
+        emp.PhoneNumber = phone;
         emp.FullName = dto.FullName.Trim();
         emp.Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email;
         emp.Position = dto.Position; emp.Department = dto.Department;
