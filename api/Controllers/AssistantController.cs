@@ -35,7 +35,7 @@ public class AssistantController(AppDbContext db, IConfiguration cfg, ILogger<As
         var key = cfg["Gemini:ApiKey"];
         if (string.IsNullOrWhiteSpace(key))
             return Fail(503, "Trợ lý AI chưa được cấu hình (thiếu Gemini__ApiKey trên server).");
-        var model = cfg["Gemini:Model"] is { Length: > 0 } m ? m : "gemini-2.5-flash";
+        var model = cfg["Gemini:Model"] is { Length: > 0 } m ? m : "gemini-3.8-flash";
 
         var contents = new JsonArray();
         foreach (var t in dto.Messages.TakeLast(12))
