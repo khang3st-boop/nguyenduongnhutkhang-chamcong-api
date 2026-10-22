@@ -51,6 +51,7 @@ builder.Services.AddScoped<EmailSender>();
 builder.Services.AddScoped<SmsSender>();
 builder.Services.AddScoped<OtpService>();
 builder.Services.AddSingleton<JwtService>();
+builder.Services.AddSingleton<NguyenDuongNhutKhang_app.Controllers.RoomPresence>();
 builder.Services.AddSingleton<QrService>();
 builder.Services.AddSingleton<QrService>();
 

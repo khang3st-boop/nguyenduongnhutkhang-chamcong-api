@@ -17,7 +17,7 @@ public class ChatController(AppDbContext db) : ApiBase
     {
         var rows = await (from m in db.Messages
                           join u in db.Users on m.SenderId equals u.Id
-                          where m.CompanyId == CompanyId && m.Id > afterId
+                          where m.CompanyId == CompanyId && m.Id > afterId && m.Kind != "room"
                           orderby m.Id descending
                           select new
                           {
