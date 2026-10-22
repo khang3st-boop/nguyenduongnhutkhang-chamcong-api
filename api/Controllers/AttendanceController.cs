@@ -210,6 +210,7 @@ public class AttendanceController(AppDbContext db, QrService qr) : ApiBase
         var start = DateTime.TryParseExact(month, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var m)
             ? new DateTime(m.Year, m.Month, 1)
             : new DateTime(Local(DateTime.UtcNow).Year, Local(DateTime.UtcNow).Month, 1);
-        return (start - Vn, start.AddMonths(1) - Vn);
+        // Npgsql chỉ nhận DateTime Kind=Utc cho cột timestamptz; để Unspecified sẽ ném lỗi 500.
+        return (DateTime.SpecifyKind(start - Vn, DateTimeKind.Utc), DateTime.SpecifyKind(start.AddMonths(1) - Vn, DateTimeKind.Utc));
     }
 }
