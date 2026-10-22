@@ -216,6 +216,9 @@ namespace NguyenDuongNhutKhang_app.Migrations
                     b.Property<string>("AvatarUrl")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<DateOnly?>("BirthDate")
+                        .HasColumnType("date");
+
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
                         .HasColumnType("nvarchar(max)");
@@ -237,6 +240,9 @@ namespace NguyenDuongNhutKhang_app.Migrations
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Gender")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("GoogleSubject")
                         .HasColumnType("nvarchar(max)");
@@ -287,6 +293,35 @@ namespace NguyenDuongNhutKhang_app.Migrations
                         .HasFilter("[NormalizedUserName] IS NOT NULL");
 
                     b.ToTable("AspNetUsers", (string)null);
+                });
+
+            modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.BlockedSite", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ChildId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Domain")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("FamilyId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FamilyId", "ChildId");
+
+                    b.ToTable("BlockedSites");
                 });
 
             modelBuilder.Entity("NguyenDuongNhutKhang_app.Data.ChatMessage", b =>
@@ -347,6 +382,9 @@ namespace NguyenDuongNhutKhang_app.Migrations
 
                     b.Property<string>("OwnerId")
                         .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("PinHash")
                         .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
@@ -448,6 +486,12 @@ namespace NguyenDuongNhutKhang_app.Migrations
                         .IsRequired()
                         .HasMaxLength(120)
                         .HasColumnType("nvarchar(120)");
+
+                    b.Property<bool>("NotifyEnter")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("NotifyExit")
+                        .HasColumnType("bit");
 
                     b.Property<double>("RadiusMeters")
                         .HasColumnType("float");

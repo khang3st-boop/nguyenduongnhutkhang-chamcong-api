@@ -15,6 +15,8 @@ public class AppUser : IdentityUser
     public string? AvatarUrl { get; set; }
     public int? FamilyId { get; set; }
     public string? GoogleSubject { get; set; }
+    public DateOnly? BirthDate { get; set; }
+    public string? Gender { get; set; } // male | female | unspecified
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
@@ -23,6 +25,7 @@ public class Family
     public int Id { get; set; }
     public string Name { get; set; } = "";
     public string OwnerId { get; set; } = "";
+    public string? PinHash { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
@@ -34,6 +37,8 @@ public class SafeZone
     public double Latitude { get; set; }
     public double Longitude { get; set; }
     public double RadiusMeters { get; set; }
+    public bool NotifyEnter { get; set; } = true;
+    public bool NotifyExit { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
@@ -105,4 +110,14 @@ public class OtpCode
     public DateTime ExpiresAt { get; set; }
     public int Attempts { get; set; }
     public bool Used { get; set; }
+}
+
+/// <summary>Tên miền bị chặn trong trình duyệt an toàn. ChildId rỗng = áp dụng cho cả gia đình.</summary>
+public class BlockedSite
+{
+    public int Id { get; set; }
+    public int FamilyId { get; set; }
+    public string? ChildId { get; set; }
+    public string Domain { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

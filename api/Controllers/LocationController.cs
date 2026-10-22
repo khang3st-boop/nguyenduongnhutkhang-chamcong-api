@@ -37,6 +37,7 @@ public class LocationController(AppDbContext db) : ApiBase
             }
             if (st.Inside == inside) continue;
             st.Inside = inside;
+            if (inside ? !z.NotifyEnter : !z.NotifyExit) continue; // phụ huynh tắt thông báo hướng này
             var type = inside ? "EnterZone" : "ExitZone";
             var msg = inside ? $"{name} đã vào vùng \"{z.Name}\"." : $"{name} đã rời khỏi vùng an toàn \"{z.Name}\" ({dist:0} m từ tâm).";
             db.Alerts.Add(new Alert

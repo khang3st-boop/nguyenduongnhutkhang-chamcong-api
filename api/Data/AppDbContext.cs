@@ -13,6 +13,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<ChatMessage> Messages => Set<ChatMessage>();
     public DbSet<TranslationRecord> Translations => Set<TranslationRecord>();
     public DbSet<OtpCode> OtpCodes => Set<OtpCode>();
+    public DbSet<BlockedSite> BlockedSites => Set<BlockedSite>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -32,6 +33,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         b.Entity<TranslationRecord>().Property(t => t.SourceText).HasMaxLength(4000);
         b.Entity<TranslationRecord>().Property(t => t.TranslatedText).HasMaxLength(4000);
         b.Entity<TranslationRecord>().HasIndex(t => new { t.FamilyId, t.CreatedAt });
+        b.Entity<BlockedSite>().Property(x => x.Domain).HasMaxLength(200);
+        b.Entity<BlockedSite>().HasIndex(x => new { x.FamilyId, x.ChildId });
         b.Entity<OtpCode>().HasIndex(o => new { o.UserId, o.Purpose });
     }
 }

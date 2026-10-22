@@ -11,9 +11,13 @@ public record ChildCreateDto(
     [Required, StringLength(40, MinimumLength = 3), RegularExpression(@"^[A-Za-z0-9_.]+$")] string Username,
     [Required, MinLength(6)] string Password,
     [Required, StringLength(120)] string FullName,
-    [EmailAddress] string? Email);
+    [EmailAddress] string? Email,
+    DateOnly? BirthDate = null,
+    [RegularExpression("^(male|female|unspecified)$")] string? Gender = null);
 
-public record ChildUpdateDto([Required, StringLength(120)] string FullName, [MinLength(6)] string? Password, [EmailAddress] string? Email);
+public record ChildUpdateDto([Required, StringLength(120)] string FullName, [MinLength(6)] string? Password, [EmailAddress] string? Email,
+    DateOnly? BirthDate = null,
+    [RegularExpression("^(male|female|unspecified)$")] string? Gender = null);
 
 /// <summary>CRUD hồ sơ trẻ em của gia đình (chỉ phụ huynh).</summary>
 [Authorize(Roles = Roles.Parent), Route("api/[controller]")]
@@ -31,7 +35,7 @@ public class ChildrenController(UserManager<AppUser> users, AppDbContext db) : A
             var l = last.FirstOrDefault(x => x.UserId == k.Id);
             return new
             {
-                k.Id, userName = k.UserName, k.FullName, k.Email, k.AvatarUrl, k.CreatedAt,
+                k.Id, userName = k.UserName, k.FullName, k.Email, k.AvatarUrl, k.CreatedAt, k.BirthDate, k.Gender,
                 lastLocation = l == null ? null : new { l.Latitude, l.Longitude, l.Accuracy, l.Battery, l.CreatedAt }
             };
         }));
@@ -41,7 +45,7 @@ public class ChildrenController(UserManager<AppUser> users, AppDbContext db) : A
     public async Task<IActionResult> Get(string id)
     {
         var k = await Kids().FirstOrDefaultAsync(x => x.Id == id);
-        return k == null ? NotFound() : Ok(new { k.Id, userName = k.UserName, k.FullName, k.Email, k.AvatarUrl, k.CreatedAt });
+        return k == null ? NotFound() : Ok(new { k.Id, userName = k.UserName, k.FullName, k.Email, k.AvatarUrl, k.CreatedAt, k.BirthDate, k.Gender });
     }
 
     [HttpPost]
@@ -51,7 +55,7 @@ public class ChildrenController(UserManager<AppUser> users, AppDbContext db) : A
         var kid = new AppUser
         {
             UserName = dto.Username, FullName = dto.FullName.Trim(), Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email,
-            EmailConfirmed = true, FamilyId = FamilyId
+            EmailConfirmed = true, FamilyId = FamilyId, BirthDate = dto.BirthDate, Gender = dto.Gender
         };
         var r = await users.CreateAsync(kid, dto.Password);
         if (!r.Succeeded) return BadRequest(new { status = false, message = string.Join(" ", r.Errors.Select(e => e.Description)) });
@@ -66,6 +70,7 @@ public class ChildrenController(UserManager<AppUser> users, AppDbContext db) : A
         if (kid == null) return NotFound();
         kid.FullName = dto.FullName.Trim();
         kid.Email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email;
+        kid.BirthDate = dto.BirthDate; kid.Gender = dto.Gender;
         var r = await users.UpdateAsync(kid);
         if (r.Succeeded && !string.IsNullOrEmpty(dto.Password))
         {
@@ -87,6 +92,7 @@ public class ChildrenController(UserManager<AppUser> users, AppDbContext db) : A
         db.Translations.RemoveRange(db.Translations.Where(t => t.ChildId == id));
         db.Messages.RemoveRange(db.Messages.Where(m => m.SenderId == id));
         db.OtpCodes.RemoveRange(db.OtpCodes.Where(o => o.UserId == id));
+        db.BlockedSites.RemoveRange(db.BlockedSites.Where(b => b.ChildId == id));
         await db.SaveChangesAsync();
         await users.DeleteAsync(kid);
         return NoContent();
