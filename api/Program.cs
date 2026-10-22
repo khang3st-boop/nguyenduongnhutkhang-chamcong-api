@@ -50,7 +50,6 @@ builder.Services.Configure<AgoraOptions>(cfg.GetSection("Agora"));
 builder.Services.Configure<AdminSeedOptions>(cfg.GetSection("Admin"));
 builder.Services.AddScoped<EmailSender>();
 builder.Services.AddScoped<SmsSender>();
-builder.Services.Configure<DemoOptions>(builder.Configuration.GetSection("Demo"));
 builder.Services.AddScoped<OtpService>();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddSingleton<NguyenDuongNhutKhang_app.Controllers.RoomPresence>();
