@@ -68,24 +68,24 @@ public class AuthController(
         await users.AddToRoleAsync(kid, Roles.Child);
         invite.UsedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
-        return Ok(new { status = true, message = "Đăng ký thành công. Hãy đăng nhập.", requiresEmailVerification = false });
+        return Ok(await Session(kid));
     }
 
     [HttpPost("verify-email")]
     public async Task<IActionResult> VerifyEmail(OtpDto dto)
     {
-        var user = await users.FindByNameAsync(dto.Username);
+        var user = await FindUser(dto.Username);
         if (user == null || !await otp.VerifyAsync(user.Id, "verify-email", dto.Code))
             return Fail(400, "Mã không đúng hoặc đã hết hạn.");
         user.EmailConfirmed = true;
         await users.UpdateAsync(user);
-        return Ok(new { status = true, message = "Email đã được xác minh. Hãy đăng nhập." });
+        return Ok(await Session(user));
     }
 
     [HttpPost("resend-email-code")]
     public async Task<IActionResult> ResendEmailCode(UsernameDto dto)
     {
-        var user = await users.FindByNameAsync(dto.Username);
+        var user = await FindUser(dto.Username);
         if (user == null || user.EmailConfirmed || user.Email == null) return Ok(new { status = true });
         return await SendOtp(user, "verify-email", user.Email, "xác minh email")
                ?? Ok(new { status = true, message = "Đã gửi lại mã." });
@@ -122,7 +122,7 @@ public class AuthController(
     [HttpPost("resend-login-otp")]
     public async Task<IActionResult> ResendLoginOtp(UsernameDto dto)
     {
-        var user = await users.FindByNameAsync(dto.Username);
+        var user = await FindUser(dto.Username);
         if (user == null) return Ok(new { status = true });
         var role = (await users.GetRolesAsync(user)).FirstOrDefault() ?? "";
         var target = await OtpTarget(user, role);
@@ -134,7 +134,7 @@ public class AuthController(
     [HttpPost("verify-otp")]
     public async Task<IActionResult> VerifyOtp(OtpDto dto)
     {
-        var user = await users.FindByNameAsync(dto.Username);
+        var user = await FindUser(dto.Username);
         if (user == null || await users.IsLockedOutAsync(user) || !await otp.VerifyAsync(user.Id, "login", dto.Code))
             return Fail(401, "Mã OTP không đúng hoặc đã hết hạn.");
         return Ok(await Session(user));
@@ -196,6 +196,9 @@ public class AuthController(
     }
 
     // ---- helpers ----
+    private async Task<AppUser?> FindUser(string nameOrEmail) =>
+        await users.FindByNameAsync(nameOrEmail) ?? await users.FindByEmailAsync(nameOrEmail);
+
     private async Task<object> Session(AppUser user)
     {
         var role = (await users.GetRolesAsync(user)).First();
