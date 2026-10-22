@@ -55,6 +55,7 @@ public class AuthController(
         user.CompanyId = company.Id;
         await users.UpdateAsync(user);
         await users.AddToRoleAsync(user, Roles.Manager);
+        await users.AddClaimAsync(user, new System.Security.Claims.Claim(Approval.Type, Approval.Pending)); // chờ admin/quản lý khác duyệt
 
         // Người đăng ký chọn nhận mã xác minh qua email hay SMS; gửi lỗi thì xóa tài khoản vừa tạo để đăng ký lại được.
         var target = viaSms ? phone! : user.Email!;
@@ -110,6 +111,8 @@ public class AuthController(
             return Fail(400, "Mã không đúng hoặc đã hết hạn.");
         user.EmailConfirmed = true;
         await users.UpdateAsync(user);
+        if (await IsPending(user))
+            return Ok(new { status = true, pendingApproval = true, message = PendingMsg });
         return Ok(await Session(user));
     }
 
@@ -145,6 +148,7 @@ public class AuthController(
             await SendOtp(user, "verify-email", user.Email!, "xác minh email");
             return StatusCode(403, new { status = false, message = "Email chưa được xác minh. Đã gửi mã mới.", needsEmailVerification = true, username = user.UserName });
         }
+        if (await IsPending(user)) return StatusCode(403, new { status = false, message = PendingMsg, pendingApproval = true });
 
         var (target, isSms) = await ResolveTarget(user, role, dto.Channel);
         if (target == null)
@@ -223,6 +227,7 @@ public class AuthController(
         else
         {
             if (await users.IsLockedOutAsync(user)) return Fail(403, "Tài khoản đã bị khóa.");
+            if (await IsPending(user)) return StatusCode(403, new { status = false, message = PendingMsg, pendingApproval = true });
             if (user.GoogleSubject == null) { user.GoogleSubject = payload.Subject; user.EmailConfirmed = true; await users.UpdateAsync(user); }
         }
         return Ok(await Session(user));
@@ -311,6 +316,10 @@ public class AuthController(
     // ---- helpers ----
     private async Task<AppUser?> FindUser(string nameOrEmail) =>
         await users.FindByNameAsync(nameOrEmail) ?? await users.FindByEmailAsync(nameOrEmail);
+
+    private const string PendingMsg = "Tài khoản quản lý đang chờ admin hoặc một quản lý khác duyệt. Bạn sẽ đăng nhập được sau khi được duyệt.";
+    private async Task<bool> IsPending(AppUser user) =>
+        (await users.GetClaimsAsync(user)).Any(c => c.Type == Approval.Type && c.Value == Approval.Pending);
 
     private async Task<object> Session(AppUser user)
     {
