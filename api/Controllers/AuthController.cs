@@ -186,16 +186,11 @@ public class AuthController(
                    ?? await users.FindByEmailAsync(payload.Email);
         if (user == null)
         {
-            // Gmail chưa có trong hệ thống: app hỏi người dùng là quản lý hay nhân viên (nhân viên nhập mã mời của quản lý).
-            if (string.IsNullOrEmpty(dto.Role))
+            // Gmail chưa có trong hệ thống: chỉ được tạo tài khoản NHÂN VIÊN bằng mã mời của quản lý (quản lý đăng ký bằng form email + OTP).
+            if (string.IsNullOrEmpty(dto.InviteCode))
                 return Ok(new { status = true, needsRole = true, email = payload.Email, name = payload.Name });
-            CompanyInvite? invite = null;
-            if (dto.Role == "employee")
-            {
-                invite = string.IsNullOrEmpty(dto.InviteCode) ? null
-                    : await db.CompanyInvites.FirstOrDefaultAsync(i => i.Code == dto.InviteCode && i.UsedAt == null && i.ExpiresAt > DateTime.UtcNow);
-                if (invite == null) return Fail(400, "Mã mời không đúng hoặc đã hết hạn. Hãy nhờ quản lý tạo mã mới.");
-            }
+            var invite = await db.CompanyInvites.FirstOrDefaultAsync(i => i.Code == dto.InviteCode && i.UsedAt == null && i.ExpiresAt > DateTime.UtcNow);
+            if (invite == null) return Fail(400, "Mã mời không đúng hoặc đã hết hạn. Hãy nhờ quản lý tạo mã mới.");
             var baseName = new string(payload.Email.Split('@')[0].Where(char.IsLetterOrDigit).ToArray());
             var name = baseName;
             for (var i = 1; await users.FindByNameAsync(name) != null; i++) name = baseName + i;
@@ -206,21 +201,12 @@ public class AuthController(
             };
             var created = await users.CreateAsync(user);
             if (!created.Succeeded) return Fail(400, string.Join(" ", created.Errors.Select(e => e.Description)));
-            if (invite != null)
-            {
-                user.CompanyId = invite.CompanyId;
-                await users.UpdateAsync(user);
-                await users.AddToRoleAsync(user, Roles.Employee);
-                invite.UsedAt = DateTime.UtcNow;
-                await db.SaveChangesAsync();
-                return Ok(await Session(user));
-            }
-            var company = new Company { Name = $"Công ty của {user.FullName}", OwnerId = user.Id };
-            db.Companies.Add(company);
-            await db.SaveChangesAsync();
-            user.CompanyId = company.Id;
+            user.CompanyId = invite.CompanyId;
             await users.UpdateAsync(user);
-            await users.AddToRoleAsync(user, Roles.Manager);
+            await users.AddToRoleAsync(user, Roles.Employee);
+            invite.UsedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+            return Ok(await Session(user));
         }
         else
         {
